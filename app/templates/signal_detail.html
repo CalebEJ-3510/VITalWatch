@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, page_head, note %}
+{% block title %}{{ s.coded_term }} · {{ s.trial_id }} — Signal — {{ settings.app_name }}{% endblock %}
+
+{# One trial/term pair under review (§11.3). Everything on this page is derived
+   on read: the ratio, the 2×2, the case list. What the page deliberately does
+   NOT carry is a stored "review state" — no such column exists, and faking one
+   would claim a workflow the schema does not have. A signal's disposition is
+   the safety-concern escalation raised from it; those are listed and linked. #}
+
+{% block content %}
+{% call page_head(s.coded_term ~ ' in ' ~ s.trial_id,
+        (trial.title if trial else '') ~ ' — a disproportionality signal under review, re-derived on every read.',
+        back='/signals', back_label='Signal queue') %}
+  {% if s.flagged %}
+    {{ badge('Signal — meets screening threshold', 'bad') }}
+  {% else %}
+    {{ badge('Below screening threshold', 'neutral') }}
+  {% endif %}
+  {% if s.serious %}{{ badge(s.serious ~ ' serious', 'bad-soft') }}{% endif %}
+{% endcall %}
+
+<div class="sig-layout">
+
+  <div class="sig-main">
+    <section class="panel p-5">
+      <h2 class="panel-title">The observation</h2>
+      <p class="mt-2 text-sm" style="color:var(--ink-2)">
+        <span class="code">{{ s.coded_term }}</span> (<span class="code">{{ s.coded_code }}</span>) accounts for
+        <strong>{{ s.cases }}</strong> of <strong>{{ s.trial_events }}</strong> coded events in
+        <a href="/trial/{{ s.trial_id }}">{{ s.trial_id }}</a>
+        ({{ (100 * s.cases / s.trial_events) | round(0) | int }}%),
+        against {{ s.other_cases }} of {{ s.other_events }} across the rest of the portfolio
+        ({{ (100 * s.other_cases / s.other_events) | round(0) | int if s.other_events else 0 }}%).
+        {% if s.prr is not none %}
+          The proportional reporting ratio is <strong>{{ '%.2f' | format(s.prr) }}×</strong>;
+          the screening line is PRR ≥ {{ threshold }} with at least {{ case_floor }} cases.
+        {% else %}
+          The term appears nowhere else in the portfolio — the ratio is
+          <strong>undefined</strong> (division by zero), which is itself the observation,
+          not an infinite PRR.
+        {% endif %}
+      </p>
+
+      {% set scale = threshold * 2 %}
+      <div class="mt-4" style="max-width:26rem">
+        <div class="ref" role="img" aria-label="Signal strength against the screening threshold">
+          {% if s.prr is not none %}
+          <span class="ref-fill {{ 'ref-fill-breach' if s.flagged else 'ref-fill-within' }}"
+                style="width: {{ [100 * s.prr / scale, 100] | min }}%"></span>
+          {% endif %}
+          <span class="ref-mark" style="left: 50%" title="Screening threshold — PRR {{ threshold }}"></span>
+        </div>
+        <div class="ref-legend">
+          <span>{{ '%.2f' | format(s.prr) ~ '×' if s.prr is not none else 'undefined' }}</span>
+          <span class="at">threshold {{ threshold }}× · ≥ {{ case_floor }} cases</span>
+          <span>scale 0–{{ scale }}×</span>
+        </div>
+      </div>
+
+      <table class="tbl sig-2x2 mt-4" aria-label="Contingency table behind the ratio">
+        <thead>
+          <tr><th></th><th class="num">This term</th><th class="num">Other terms</th><th class="num">Total</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-medium">{{ s.trial_id }}</td>
+            <td class="num">a = {{ s.cases }}</td>
+            <td class="num">b = {{ s.trial_events - s.cases }}</td>
+            <td class="num">{{ s.trial_events }}</td>
+          </tr>
+          <tr>
+            <td class="font-medium">Rest of portfolio</td>
+            <td class="num">c = {{ s.other_cases }}</td>
+            <td class="num">d = {{ s.other_events - s.other_cases }}</td>
+            <td class="num">{{ s.other_events }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="case-fine mt-2">
+        Uncoded events are excluded from both sides. The denominator is other reports, not
+        patients exposed — this is not an incidence rate, and a signal is not causation.
+      </p>
+    </section>
+
+    <section class="mt-4 panel">
+      <div class="panel-head">
+        <span class="panel-title">Cases behind this signal <span style="color:var(--faint)">({{ cases | length }})</span></span>
+      </div>
+      <ul class="q-list" style="border:0;box-shadow:none;border-radius:0">
+        {% for e in cases %}
+        <li class="q-row">
+          <span class="q-row-flag">
+            {% if e.serious %}{{ badge('SAE', 'bad') }}{% endif %}
+          </span>
+          <span class="q-row-main">
+            <span class="q-row-idline">
+              <a class="q-row-id" href="/ae/{{ e.id }}">{{ e.id }}</a>
+              <span class="q-row-ctx">participant <span class="code">{{ e.participant_code }}</span></span>
+            </span>
+            <span class="q-row-reason">{{ e.narrative }}</span>
+            <span class="q-row-meta">reported {{ e.reported_at | dt }} · {{ e.severity }} · {{ e.causality | label }}</span>
+          </span>
+          <span class="q-row-state">
+            <a class="q-row-action" href="/ae/{{ e.id }}">Open case →</a>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+
+  <aside class="ws-side">
+    <section class="panel p-5">
+      <h2 class="panel-title">Disposition</h2>
+      <p class="mt-2 text-sm" style="color:var(--ink-2)">
+        This screen holds no stored review state — none exists in the schema. A signal's
+        disposition is the <strong>safety-concern escalation</strong> raised from it and the
+        governance review package that follows (response → review → leadership decision).
+        That is the investigation path of this system.
+      </p>
+      {% if can_raise %}
+        <a href="/escalations/new" class="btn btn-primary mt-3">Raise safety concern</a>
+        <p class="case-fine mt-2">Raising pauses the trial's operational status and starts
+        the statutory response clock ({{ settings.statutory_clock_hours }}h, configurable).</p>
+      {% endif %}
+      {% if related_escalations %}
+      <ul class="mt-3 space-y-2">
+        {% for esc in related_escalations %}
+        <li class="text-sm">
+          <a href="/escalations/{{ esc.id }}" class="code" style="color:var(--reference)">{{ esc.id }}</a>
+          {{ badge(esc.status | label, {'open':'warn','company_responded':'info','under_leadership_review':'bad','resolved':'good','closed':'neutral'}.get(esc.status, 'neutral')) }}
+          <span class="block text-xs mt-0.5" style="color:var(--muted)">{{ esc.reason }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="case-fine mt-3">No safety-concern escalation exists for {{ s.trial_id }} yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="mt-4 panel p-5">
+      <h2 class="panel-title">Data-quality caveats</h2>
+      <ul class="mt-2 space-y-2 text-sm" style="color:var(--ink-2)">
+        <li>{{ s.cases }} case{{ '' if s.cases == 1 else 's' }} is a small numerator — treat the ranking as a triage order, nothing more.</li>
+        <li>{{ s.serious }} serious, {{ s.severe }} severe of those cases — seriousness, severity and signal strength are different facts.</li>
+        <li>Coding is against a curated demonstration vocabulary, not MedDRA — term granularity is coarser.</li>
+        <li>No chi-square or confidence interval is reported at these volumes; both would be noise.</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+
+{% call note('Why there is no "open investigation" button here') %}
+  <p>The earlier investigation-board feature was removed from this codebase; there is no
+  case board left to link to, and a button that silently routed every signal to one
+  hardcoded demonstration case is exactly the dishonesty this redesign exists to remove.
+  The investigation workflow that genuinely exists is the governance escalation:
+  raise a safety concern, and the review package (clock, structured response, reviewer
+  disposition, leadership decision, audit) is the record of the investigation.</p>
+{% endcall %}
+
+{% endblock %}

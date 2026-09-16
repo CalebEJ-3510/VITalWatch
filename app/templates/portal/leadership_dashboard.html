@@ -1,0 +1,121 @@
+{#-
+  portal/leadership_dashboard.html — the Leadership dashboard (prompt.md §9.3).
+
+  First-screen question (§5.1): "Is the institution safe, compliant, and
+  inspection-ready?" The composition puts the work only this role can do FIRST
+  (escalations under_leadership_review), then the portfolio position, then the
+  audit-chain verification — not KPIs first with decisions buried below them.
+
+  Context contract (supplied by app/main.py::leadership_dashboard):
+
+    portfolio         PortfolioKPI   kpi.portfolio_kpi — active_trials,
+                                     enrolled_total, target_total,
+                                     sites_activated, sites_total, open_queries,
+                                     overdue_monitoring_visits, open_saes,
+                                     generated_at
+    pending_decisions list           escalations with status
+                                     under_leadership_review
+    recent_decisions  list           escalations carrying a leadership_decision,
+                                     most severe/recent first (up to 10)
+    audit_head        dict           audit.verify — {"ok", "count", "head"} or
+                                     {"ok": False, "seq", "count", "error"}
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head, badge %}
+{% from "portal/_partials.html" import p_metric, p_status_badge, p_empty, p_panel_head %}
+{% set portal_id='leadership' %}{% set portal_label='Leadership portal' %}{% set portal_crumbs=[('Dashboard',None)] %}
+{% set portal_nav_sections=[('Governance',[('/portal/leadership','Dashboard',None),('#decisions','Pending decisions',pending_decisions|length or None),('/escalations','Escalation inbox',None),('/search','Global search',None),('/audit','Audit trail',None)])] %}
+{% block portal_main %}
+{% call page_head('Leadership dashboard','Is the institution safe, compliant, and inspection-ready — your pending decisions first, then the portfolio and the audit position.') %}
+  <a class="btn btn-secondary" href="/search">Global search →</a>
+{% endcall %}
+
+{# ---- 1. the work only leadership can do ------------------------------------------ #}
+<section class="panel mt-1 overflow-hidden" id="decisions">
+  {{ p_panel_head('Decisions awaiting leadership', 'escalations the reviewer escalated up — the complete review package opens on the escalation page') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Escalation</th><th>Trial</th><th>Type</th><th>Severity</th><th>Raised by</th><th>Raised</th><th>Decide</th></tr></thead>
+    <tbody>
+      {% for e in pending_decisions %}
+      <tr class="row-breach">
+        <td>
+          <span class="code">{{ e.id[:8] }}</span>
+          <div class="max-w-xs truncate text-xs text-slate-500">{{ e.reason[:90] }}{{ '…' if e.reason | length > 90 else '' }}</div>
+        </td>
+        <td class="code">{{ e.trial_id }}</td>
+        <td>{{ badge(e.escalation_type | label, 'neutral') }}</td>
+        <td>{{ badge(e.severity | label, {'critical': 'bad', 'high': 'bad', 'medium': 'warn'}.get(e.severity, 'neutral')) }}</td>
+        <td class="text-xs text-slate-600">{{ e.raised_by }} · {{ e.raised_by_role | label }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+        <td><a class="text-[color:var(--reference)] hover:underline" href="/escalations/{{ e.id }}">Open package →</a></td>
+      </tr>
+      {% else %}
+      {{ p_empty(7, 'No escalation is waiting on a leadership decision.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{# ---- 2. the portfolio position ----------------------------------------------------- #}
+<div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {{ p_metric('Pending decisions', pending_decisions|length,
+              'under leadership review', tone='bad' if pending_decisions else 'good', href='#decisions',
+              definition='Escalations with status under_leadership_review — the queue above.') }}
+  {{ p_metric('Active trials', portfolio.active_trials,
+              portfolio.enrolled_total ~ ' enrolled of ' ~ portfolio.target_total ~ ' target', tone='neutral',
+              definition='Trials in an active lifecycle status, summed over the portfolio (kpi.portfolio_kpi, derived on read).') }}
+  {{ p_metric('Open SAEs', portfolio.open_saes,
+              'serious adverse events open', tone='bad' if portfolio.open_saes else 'good',
+              definition='Open serious adverse events across the portfolio.') }}
+  {{ p_metric('Overdue monitoring visits', portfolio.overdue_monitoring_visits,
+              portfolio.sites_activated ~ ' of ' ~ portfolio.sites_total ~ ' sites activated', tone='warn' if portfolio.overdue_monitoring_visits else 'good',
+              definition='Monitoring visits past their planned date across activated sites.') }}
+</div>
+<p class="mt-2 text-[11.5px] tabular-nums text-slate-400">Portfolio derived on read · as of {{ portfolio.generated_at | dt }}</p>
+
+<div class="mt-5 grid items-start gap-5 xl:grid-cols-[1.6fr_1fr]">
+  {# ---- 3. recent leadership decisions --------------------------------------------- #}
+  <section class="panel overflow-hidden">
+    {{ p_panel_head('Recent leadership decisions', 'final decisions with their mandatory reason') }}
+    <div class="tbl-scroll"><table class="tbl">
+      <thead><tr><th>Escalation</th><th>Trial</th><th>Decision</th><th>Decided</th><th>Reason</th></tr></thead>
+      <tbody>
+        {% for e in recent_decisions %}
+        <tr>
+          <td class="code">{{ e.id[:8] }}</td>
+          <td class="code">{{ e.trial_id }}</td>
+          <td>{{ badge(e.leadership_decision | label, 'neutral') }}</td>
+          <td class="text-xs tabular-nums text-slate-400">{{ e.decision_timestamp | dt }}</td>
+          <td class="max-w-xs truncate text-xs text-slate-500">{{ e.decision_reason }}</td>
+        </tr>
+        {% else %}
+        {{ p_empty(5, 'No leadership decisions recorded yet.') }}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+  {# ---- 4. the audit position --------------------------------------------------------- #}
+  <section class="panel p-5">
+    <h2 class="panel-title">Audit-chain verification</h2>
+    {% if audit_head.ok %}
+    <div class="mt-3 flex items-center gap-2">{{ badge('Chain intact', 'good') }}</div>
+    <p class="mt-2 text-[13px] text-slate-600">
+      {{ audit_head.count }} rows verified from genesis; head hash
+      <span class="code">{{ audit_head.head[:12] }}…{{ audit_head.head[-4:] }}</span>.
+    </p>
+    {% else %}
+    <div class="mt-3 flex items-center gap-2">{{ badge('Chain broken', 'bad') }}</div>
+    <p class="mt-2 text-[13px] text-slate-600">
+      First altered row <span class="code">#{{ audit_head.seq }}</span> — {{ audit_head.error }}.
+    </p>
+    {% endif %}
+    <p class="mt-3 border-t border-slate-100 pt-3 text-[11.5px] leading-relaxed text-slate-500">
+      Verification confirms the integrity and order of stored audit records in this demonstration.
+      It does not by itself certify the organization, deployment, permissions, source data, or
+      regulatory compliance.
+    </p>
+    <p class="mt-2"><a class="text-[13px] text-[color:var(--reference)] hover:underline" href="/audit">Open the audit trail →</a></p>
+  </section>
+</div>
+{% endblock %}

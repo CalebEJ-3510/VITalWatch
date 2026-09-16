@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, page_head, note %}
+{% from "_queue.html" import qs, queue_summary, queue_empty, sort_th, pagination %}
+{% block title %}Audit trail — {{ settings.app_name }}{% endblock %}
+
+{# The audit center (§11.5): a first-class quality workspace, not a wall of
+   hashes. Human-readable rows with expandable technical detail, precise chain
+   guarantee language (§13.1), and the one queue filtered in SQL — this table
+   can outgrow memory, and its filters map cleanly onto columns. #}
+
+{% block content %}
+{% call page_head('Audit trail',
+        'Every change in sequence, with actor, reason, and before/after state. Each entry commits to the hash of the one before it.') %}
+{% endcall %}
+
+<div class="rounded border p-3 text-[13px]
+            {% if chain.ok %}border-[color:var(--within-rule)] bg-[color:var(--within-bg)] text-[color:var(--within)]
+            {% else %}border-[color:var(--breach-rule)] bg-[color:var(--breach-bg)] text-[color:var(--breach)]{% endif %}">
+  {% if chain.ok %}
+    <span class="font-medium">Chain intact.</span>
+    {{ chain.count }} event{{ '' if chain.count == 1 else 's' }} verified from genesis.
+    <span class="ml-2 font-mono text-xs opacity-70">head {{ chain.head[:16] }}…</span>
+  {% else %}
+    <span class="font-medium">Chain broken at sequence {{ chain.seq }}.</span>
+    {{ chain.error }}
+    <span class="ml-2 opacity-70">{{ chain.count }} event(s) verified before the break.</span>
+  {% endif %}
+  <div class="mt-1 text-xs opacity-80">
+    Verified at {{ verified_at | dt }} UTC — every row rehashed and compared to the hash its
+    successor committed to. Verification always walks the full chain; the filters below
+    narrow this view only.
+  </div>
+  <div class="mt-1 text-xs opacity-80">
+    Chain verification confirms the integrity and order of stored audit records in this
+    demonstration. It does not by itself certify the organization, deployment, permissions,
+    source data, or regulatory compliance.
+  </div>
+</div>
+
+{# The audit toolbar is custom (actor/date-range controls the shared macro does
+   not carry) but keeps the queue's own chrome classes and rules: one GET form,
+   filter state in the URL, submission resets to page 1. #}
+<form method="get" action="/audit" class="q-toolbar mt-4" role="search" aria-label="Filter the audit view">
+  <div class="q-toolbar-row">
+    <label class="q-search">
+      <span class="sr-only">Actor or resource id</span>
+      <input type="search" name="q" value="{{ result.q }}" placeholder="Actor or resource id"
+             class="field" autocomplete="off">
+    </label>
+    <label class="q-filter">
+      <span class="label">Actor</span>
+      <select name="actor" class="field">
+        <option value="">Anyone</option>
+        {% for a in result.actors %}
+          <option value="{{ a }}" {{ 'selected' if result.params.get('actor') == a else '' }}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="q-filter">
+      <span class="label">Action</span>
+      <select name="action" class="field">
+        <option value="">Any</option>
+        {% for a in action_options %}
+          <option value="{{ a }}" {{ 'selected' if result.params.get('action') == a else '' }}>{{ a | capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="q-filter">
+      <span class="label">Resource</span>
+      <select name="resource_type" class="field">
+        <option value="">Any</option>
+        {% for r in resource_options %}
+          <option value="{{ r }}" {{ 'selected' if result.params.get('resource_type') == r else '' }}>{{ r | label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="q-filter">
+      <span class="label">From</span>
+      <input type="date" name="date_from" value="{{ result.params.get('date_from', '') }}" class="field">
+    </label>
+    <label class="q-filter">
+      <span class="label">To</span>
+      <input type="date" name="date_to" value="{{ result.params.get('date_to', '') }}" class="field">
+    </label>
+    {% if result.params.get('dir') %}<input type="hidden" name="dir" value="{{ result.params['dir'] }}">{% endif %}
+    <button type="submit" class="btn btn-secondary">Apply</button>
+  </div>
+  {% if result.filter_error %}
+    <p class="mt-2 text-xs" style="color:var(--review)" role="alert">{{ result.filter_error }}</p>
+  {% endif %}
+</form>
+
+{{ queue_summary(result, '/audit', 'events',
+                 'Filters narrow this view only — chain verification above always walks the full table.') }}
+
+{% if result.rows %}
+<div class="panel overflow-hidden">
+  <div class="tbl-scroll"><table class="tbl">
+    <thead>
+      <tr>
+        {{ sort_th('/audit', result, 'Seq', 'seq', num=True) }}
+        {{ sort_th('/audit', result, 'Timestamp (UTC)', 'time') }}
+        {{ sort_th('/audit', result, 'Actor', 'actor') }}
+        {{ sort_th('/audit', result, 'Action', 'action') }}
+        <th>Resource</th>
+        <th>Before → after</th>
+        <th>Hash</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in result.rows %}
+      <tr class="align-top">
+        <td class="text-right tabular-nums" style="color:var(--faint)">{{ e.seq }}</td>
+        <td class="text-xs tabular-nums" style="color:var(--muted)">{{ e.timestamp_utc | dt }}</td>
+        <td>
+          <div style="color:var(--ink-2)">{{ e.actor }}</div>
+          {% if e.role %}<div class="text-xs" style="color:var(--faint)">{{ e.role | label }}</div>{% endif %}
+        </td>
+        <td>{{ badge(e.action | capitalize, {'create':'good','delete':'bad','update':'info','view':'neutral'}.get(e.action, 'neutral')) }}</td>
+        <td>
+          <div style="color:var(--ink-2)">{{ e.resource_type | label }}</div>
+          <div class="code text-xs" style="color:var(--faint)">{{ e.resource_id or '—' }}</div>
+        </td>
+        <td>
+          {% if e.before_json or e.after_json %}
+          <details>
+            <summary class="cursor-pointer text-xs" style="color:var(--reference)">
+              {% if e.before_json and e.after_json %}changed
+              {% elif e.after_json %}created
+              {% else %}removed{% endif %}
+            </summary>
+            <div class="mt-2 space-y-2">
+              {% if e.reason %}<div class="text-xs italic" style="color:var(--muted)">{{ e.reason }}</div>{% endif %}
+              {% if e.before_json %}
+              <div>
+                <div class="text-xs font-medium" style="color:var(--muted)">before</div>
+                <pre class="mt-0.5 max-w-md overflow-x-auto rounded p-2 text-xs" style="background:var(--surface-sunk);color:var(--ink-2)">{{ e.before_json }}</pre>
+              </div>
+              {% endif %}
+              {% if e.after_json %}
+              <div>
+                <div class="text-xs font-medium" style="color:var(--muted)">after</div>
+                <pre class="mt-0.5 max-w-md overflow-x-auto rounded p-2 text-xs" style="background:var(--surface-sunk);color:var(--ink-2)">{{ e.after_json }}</pre>
+              </div>
+              {% endif %}
+            </div>
+          </details>
+          {% elif e.reason %}
+            <span class="text-xs italic" style="color:var(--muted)">{{ e.reason }}</span>
+          {% else %}
+            <span class="text-xs" style="color:var(--faint)">—</span>
+          {% endif %}
+        </td>
+        <td class="code text-xs" style="color:var(--faint)" title="{{ e.hash }}">
+          {{ e.hash[:10] }}…
+          <div style="color:var(--rule-strong)" title="{{ e.prev_hash }}">← {{ e.prev_hash[:10] }}…</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{{ pagination('/audit', result) }}
+{% else %}
+{{ queue_empty(result, '/audit', 'events',
+               'No audit events yet.',
+               'Every audited mutation — filing, coding, escalation, decision — appends here in the same transaction as the change itself.') }}
+{% endif %}
+
+{% call note('How immutability is enforced') %}
+  <p>This table has no edit or delete control, and neither does the database: UPDATE and DELETE
+  on <code class="code">audit_events</code> raise at the storage layer, so the guarantee
+  does not depend on the application behaving. Export with authorization, scope and an
+  export-event record is not built — no export control is shown here rather than a fake one.</p>
+{% endcall %}
+
+{% endblock %}

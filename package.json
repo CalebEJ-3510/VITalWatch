@@ -1,0 +1,12 @@
+{
+  "name": "vitalwatch-frontend-assets",
+  "private": true,
+  "description": "Local asset build for the VITalWatch frontend. Replaces the CDN Tailwind dependency (prompt.md section 6.1.1; Phase 1 deliverable).",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i app/static/src/tailwind.input.css -o app/static/vendor/tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i app/static/src/tailwind.input.css -o app/static/vendor/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.14"
+  }
+}

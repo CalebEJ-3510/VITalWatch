@@ -1,0 +1,316 @@
+{#-
+  portal/_partials.html — shared building blocks for every role portal.
+
+  Everything a role screen needs is here once, so a "queue row", a "metric",
+  an "AI suggestion" or a "statutory clock" means the same thing on the
+  Volunteer dashboard and on the Leadership review package. Pages import the
+  macros they use:
+
+    {% from "portal/_partials.html" import p_metric, p_status_badge, ... %}
+
+  Colour discipline: these macros map to the repository's existing three-state
+  badge family (breach / review / within, plus neutral) through _macros.html's
+  `badge` — nothing here may introduce a fourth colour. AI output is always
+  rendered as a *suggestion* (the monospace `chip`), never as a status, per the
+  roadmap risk register R4.
+-#}
+{% from "_macros.html" import badge %}
+
+
+{# Metric tile. Same `.metric` skins as every other screen, so a red left edge
+   means a breach here exactly as it does on the Safety Officer's /ae register.
+   `href` wraps the tile in a link when given. #}
+{% macro p_metric(label, value, sub=None, tone='neutral', href=None, definition=None) -%}
+  {% set skin = {'neutral': '', 'good': 'metric-within', 'warn': 'metric-review', 'bad': 'metric-breach'}.get(tone, '') %}
+  {% set inner %}
+    <div class="label">{{ label }}</div>
+    <div class="metric-value mt-1 tabular-nums text-[1.75rem]">{{ value }}</div>
+    {% if sub %}<div class="metric-sub">{{ sub }}</div>{% endif %}
+  {% endset %}
+  {% if href %}
+    <a href="{{ href }}" class="metric {{ skin }}">{{ inner }}</a>
+  {% else %}
+    <div class="metric {{ skin }}">{{ inner }}</div>
+  {% endif %}
+  {# The definition travels with the number — a KPI that is just an integer leaves
+     every reader to invent its own meaning for it. #}
+  {% if definition %}<p class="sr-only">{{ definition }}</p>{% endif %}
+{%- endmacro %}
+
+
+{# Trial/escalation/participation status -> pill, acronyms intact via `|label`.
+   The mapping is exhaustive over the enum vocabulary in app/models.py:
+     within   active, normal, eligible, resolved, recovered, on_track
+     review   paused_*, under_*, open, company_responded, due_soon, pending,
+              more_information_required, incomplete, recovering, not_recovered
+     breach   escalated, breached, critical, severe, high, not_eligible,
+              terminated, overdue, fatal
+   Anything unknown renders neutral rather than guessing a state. #}
+{% set PORTAL_STATUS_TONES = {
+  'active': 'good', 'normal': 'good', 'eligible': 'good', 'resolved': 'good',
+  'recovered': 'good', 'on_track': 'good', 'within': 'good', 'satisfied': 'good',
+  'paused_protocol_review': 'warn', 'paused_safety_review': 'warn',
+  'under_leadership_review': 'warn', 'under_review': 'warn', 'open': 'warn',
+  'company_responded': 'warn', 'due_soon': 'warn', 'pending': 'warn',
+  'more_information_required': 'warn', 'incomplete': 'warn', 'recovering': 'warn',
+  'not_recovered': 'warn', 'at_risk': 'warn',
+  'escalated': 'bad', 'breached': 'bad', 'critical': 'bad', 'severe': 'bad',
+  'high': 'bad', 'not_eligible': 'bad', 'terminated': 'bad', 'overdue': 'bad',
+  'fatal': 'bad', 'withdrawn': 'neutral', 'closed': 'neutral', 'decided': 'neutral',
+  'none': 'neutral', 'completed': 'neutral', 'not_applicable': 'neutral'
+} %}
+{% macro p_status_badge(status) -%}
+  {{ badge(status | label, PORTAL_STATUS_TONES.get(status, 'neutral')) }}
+{%- endmacro %}
+
+
+{# Adverse-event statutory clock (app/pv.py's TimelineStatus) -> pill. #}
+{% macro p_clock_badge(status) -%}
+  {% if status == 'breached' %}{{ badge('Breached', 'bad') }}
+  {% elif status == 'due_soon' %}{{ badge('Due soon', 'warn') }}
+  {% elif status == 'on_track' %}{{ badge('On time', 'good') }}
+  {% else %}{{ badge('No clock', 'neutral') }}{% endif %}
+{%- endmacro %}
+
+
+{# The statutory response clock as a progress bar — the same geometry as
+   escalation_detail.html's spec section 44 clock. `progress` is the dict
+   app/governance.py::clock_progress returns:
+   {applicable, pct, hours_left, overdue, responded}. #}
+{% macro p_clock_bar(progress, period_hours=None) -%}
+  {% if progress.applicable %}
+  <div class="mt-1">
+    <div class="flex items-baseline justify-between text-xs tabular-nums text-slate-500">
+      <span>{% if period_hours %}{{ period_hours }}h statutory window{% else %}Statutory window{% endif %}</span>
+      <span>
+        {% if progress.responded %}response recorded
+        {% elif progress.overdue %}overdue by {{ (-progress.hours_left) | round(1) }}h
+        {% elif progress.hours_left is not none %}{{ progress.hours_left | round(1) }}h remaining
+        {% else %}deadline unreadable{% endif %}
+      </span>
+    </div>
+    <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+      <div class="h-full"
+           style="width: {{ progress.pct }}%; background:
+                  {% if progress.overdue and not progress.responded %}var(--breach){% else %}var(--reference){% endif %};"></div>
+    </div>
+  </div>
+  {% endif %}
+{%- endmacro %}
+
+
+{# An AI finding, rendered the way the project says AI must be rendered:
+   advisory, versioned, confidence-stated, and waiting on a named human.
+   `f` is an ai_findings row (or dict): kind, finding, explanation,
+   engine_version, confidence, recommended_action, human_reviewer,
+   human_decision, review_timestamp. #}
+{% macro p_ai_finding(f) -%}
+  <div class="mt-3 rounded-lg border border-slate-200 bg-white p-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <span class="chip">{{ f.kind | label }}</span>
+      {% if f.human_decision %}{{ badge('Reviewed', 'good') }}{% else %}{{ badge('Awaiting human review', 'warn') }}{% endif %}
+    </div>
+    <div class="mt-2 text-sm font-medium text-slate-800">{{ f.finding }}</div>
+    <p class="mt-1 text-[13px] leading-relaxed text-slate-600">{{ f.explanation }}</p>
+    <p class="mt-1 text-[11.5px] tabular-nums text-slate-400">
+      engine {{ f.engine_version }} · confidence {{ f.confidence }}
+    </p>
+    {% if f.recommended_action %}
+    <p class="mt-1.5 text-[12.5px] text-slate-500"><span class="font-medium text-slate-600">Suggested:</span> {{ f.recommended_action }}</p>
+    {% endif %}
+    {% if f.human_decision %}
+    <p class="mt-2 border-t border-slate-100 pt-2 text-[12px] text-slate-600">
+      <span class="font-medium">{{ f.human_reviewer }}</span> — {{ f.human_decision }}
+      ({{ f.review_timestamp | dt }})
+    </p>
+    {% else %}
+    <p class="mt-2 border-t border-slate-100 pt-2 text-[12px] text-slate-400">
+      AI can detect and recommend; it cannot decide. This finding changes nothing
+      until a named reviewer records a decision.
+    </p>
+    {% endif %}
+  </div>
+{%- endmacro %}
+
+
+{# A monospace suggestion chip — the visual signature of "this is an AI output,
+   not a status". Used for eligibility pre-screens and coding suggestions. #}
+{% macro p_suggestion(text, tone='neutral') -%}
+  <span class="chip" title="AI suggestion — advisory, not a status">{{ text }}</span>
+{%- endmacro %}
+
+
+{# Quick action tile (spec section 40's four volunteer quick actions live on
+   these). `tone` skins the left edge: neutral | good | warn | bad. #}
+{% macro p_quick_action(label, href, hint=None, tone='neutral') -%}
+  <a href="{{ href }}" class="metric {{ {'good': 'metric-within', 'warn': 'metric-review', 'bad': 'metric-breach'}.get(tone, '') }} py-4">
+    <div class="text-[13.5px] font-semibold text-slate-800">{{ label }} →</div>
+    {% if hint %}<div class="mt-1 text-[12px] leading-snug text-slate-500">{{ hint }}</div>{% endif %}
+  </a>
+{%- endmacro %}
+
+
+{# Consistent form field. `kind`: text | date | number | email | textarea | select | checkbox.
+   `options` (select) is a list of (value, label). Every field is labelled and
+   can carry a one-line hint; required fields say so rather than relying on the
+   browser's asterisk alone. #}
+{% macro p_field(label, name, kind='text', required=False, placeholder=None, value=None, options=None, hint=None, rows=2, id=None) -%}
+  {% set fid = id or (name ~ '-' ~ loop.index0 if loop else name) %}
+  <label class="block text-sm" for="{{ fid }}">
+    <span class="label">{{ label }}{% if required %} <span class="text-[color:var(--breach)]" aria-hidden="true">*</span>{% endif %}</span>
+    {%- if kind == 'textarea' -%}
+    <textarea id="{{ fid }}" name="{{ name }}" rows="{{ rows }}"
+              class="field mt-1" placeholder="{{ placeholder or '' }}"{% if required %} required{% endif %}>{{ value or '' }}</textarea>
+    {%- elif kind == 'select' -%}
+    <select id="{{ fid }}" name="{{ name }}" class="field mt-1"{% if required %} required{% endif %}>
+      {% if value is not none and value not in (options | map(attribute=0) | list) %}
+      <option value="{{ value }}" selected>{{ value }}</option>
+      {% endif %}
+      {% for opt_value, opt_label in options or [] %}
+      <option value="{{ opt_value }}" {{ 'selected' if opt_value == value else '' }}>{{ opt_label }}</option>
+      {% endfor %}
+    </select>
+    {%- elif kind == 'checkbox' -%}
+    <input id="{{ fid }}" type="checkbox" name="{{ name }}" value="1" class="mt-1 h-4 w-4"
+      {% if value %}checked{% endif %}>
+    {%- else -%}
+    <input id="{{ fid }}" type="{{ kind }}" name="{{ name }}" class="field mt-1"
+           placeholder="{{ placeholder or '' }}" value="{{ value or '' }}"{% if required %} required{% endif %}>
+    {%- endif -%}
+    {% if hint %}<span class="mt-1 block text-[11.5px] leading-snug text-slate-400">{{ hint }}</span>{% endif %}
+  </label>
+{%- endmacro %}
+
+
+{# Empty state for a table body. #}
+{% macro p_empty(colspan, message) -%}
+  <tr><td colspan="{{ colspan }}" class="px-4 py-8 text-center text-sm text-slate-400">{{ message }}</td></tr>
+{%- endmacro %}
+
+
+{# --------------------------------------------------------------------------- #}
+{# Table toolkit (spec section 39): search, filter, sort, pagination, column   #}
+{# selection as a shared macro over every operational table. Client-side,      #}
+{# dependency-free; the server still owns what a row may contain — this        #}
+{# controls what a reader can see and reach, not what is true.                 #}
+{#                                                                             #}
+{# Usage:                                                                      #}
+{#   {{ p_toolkit_start('tbl-queue') }}                                       #}
+{#   <div class="tbl-scroll"><table class="tbl" id="tbl-queue">               #}
+{#     <thead><tr><th data-sort>Trial</th>…</tr></thead>                       #}
+{#     <tbody>…rows…</tbody></table></div>                                    #}
+{#   {{ p_toolkit_end('tbl-queue') }}                                         #}
+{#                                                                             #}
+{# Columns marked data-sort become click-to-sort; data-hide-able adds a       #}
+{# column-selection checkbox to the toolbar.                                   #}
+{# --------------------------------------------------------------------------- #}
+{% macro p_toolkit_start(table_id, page_size=10) -%}
+  <div class="panel-head" id="{{ table_id }}-toolbar">
+    <span class="panel-title" id="{{ table_id }}-info">…</span>
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="sr-only" for="{{ table_id }}-search">Search this table</label>
+      <input type="search" id="{{ table_id }}-search" class="field" style="width:200px"
+             placeholder="Search" autocomplete="off">
+      <div id="{{ table_id }}-columns" class="hidden items-center gap-2"></div>
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro p_toolkit_end(table_id, page_size=10) -%}
+  <div class="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[12px] text-slate-500"
+       id="{{ table_id }}-pages">
+    <span id="{{ table_id }}-pageinfo">Page 1 of 1</span>
+    <span class="flex gap-1">
+      <button type="button" data-dir="prev" class="btn btn-quiet" style="padding:.2rem .6rem">← Prev</button>
+      <button type="button" data-dir="next" class="btn btn-quiet" style="padding:.2rem .6rem">Next →</button>
+    </span>
+  </div>
+  <script>
+  (function () {
+    var id = {{ table_id | tojson }};
+    var size = {{ page_size | tojson }};
+    var table = document.getElementById(id);
+    if (!table || !table.tBodies[0]) { return; }
+    var body = table.tBodies[0];
+    var input = document.getElementById(id + '-search');
+    var info = document.getElementById(id + '-info');
+    var pageinfo = document.getElementById(id + '-pageinfo');
+    var pagesEl = document.getElementById(id + '-pages');
+    var page = 1;
+    var rows = Array.prototype.slice.call(body.rows);
+
+    function visible() {
+      var term = input ? input.value.trim().toLowerCase() : '';
+      return rows.filter(function (r) {
+        return !term || r.textContent.toLowerCase().indexOf(term) !== -1;
+      });
+    }
+
+    function render() {
+      var v = visible();
+      var total = Math.max(1, Math.ceil(v.length / size));
+      if (page > total) { page = total; }
+      var start = (page - 1) * size;
+      rows.forEach(function (r) { r.style.display = 'none'; });
+      v.slice(start, start + size).forEach(function (r) { r.style.display = ''; });
+      if (info) { info.textContent = v.length + ' row' + (v.length === 1 ? '' : 's'); }
+      if (pageinfo) { pageinfo.textContent = 'Page ' + page + ' of ' + total; }
+      if (pagesEl) {
+        pagesEl.querySelectorAll('button').forEach(function (b) {
+          b.disabled = (b.dataset.dir === 'prev' && page <= 1) ||
+                       (b.dataset.dir === 'next' && page >= total);
+        });
+      }
+    }
+
+    if (input) {
+      input.addEventListener('input', function () { page = 1; render(); });
+    }
+    if (pagesEl) {
+      pagesEl.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button');
+        if (!btn || btn.disabled) { return; }
+        if (btn.dataset.dir === 'prev') { page = page - 1; }
+        if (btn.dataset.dir === 'next') { page = page + 1; }
+        render();
+      });
+    }
+
+    Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (th) {
+      th.style.cursor = 'pointer';
+      th.title = 'Click to sort';
+      th.addEventListener('click', function () {
+        var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+        var dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
+        Array.prototype.forEach.call(table.querySelectorAll('th[data-sort]'), function (o) {
+          o.dataset.dir = '';
+        });
+        th.dataset.dir = dir;
+        rows.sort(function (a, b) {
+          var x = a.children[idx] ? a.children[idx].textContent.trim() : '';
+          var y = b.children[idx] ? b.children[idx].textContent.trim() : '';
+          var nx = parseFloat(x);
+          var ny = parseFloat(y);
+          var r = (!isNaN(nx) && !isNaN(ny)) ? (nx - ny) : x.localeCompare(y);
+          return dir === 'asc' ? r : -r;
+        });
+        rows.forEach(function (r2) { body.appendChild(r2); });
+        page = 1;
+        render();
+      });
+    });
+
+    render();
+  })();
+  </script>
+{%- endmacro %}
+
+
+{# Section header for a panel that owns a queue or a table, so the caption
+   ("worst clock first", "top 5 of 23") lands in the same place on every screen. #}
+{% macro p_panel_head(title, sub=None, actions=None) -%}
+  <div class="panel-head">
+    <span class="panel-title">{{ title }}{% if sub %}<span class="ml-2 font-normal text-slate-400">{{ sub }}</span>{% endif %}</span>
+    {% if actions is defined and actions %}{{ actions() }}{% endif %}
+  </div>
+{%- endmacro %}

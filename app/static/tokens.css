@@ -1,0 +1,185 @@
+/* VITalWatch — design tokens. The single source of truth.
+   ---------------------------------------------------------------------------
+   Phase 1 deliverable (prompt.md §6.3). app.css consumes these variables and no
+   longer defines any of them; if a value exists here and in a component rule,
+   the component rule is wrong.
+
+   ── The indigo question, resolved in writing ────────────────────────────────
+   The old app.css header claimed indigo was reserved "everywhere and
+   exclusively" for the reference line, then used it for primary buttons, the
+   focus ring and the active nav marker. A meaning described as exclusive while
+   being shared is not a system, it is a coincidence. Resolved as follows:
+
+     --reference (indigo) means ONE thing: *the line you are measured against,
+     and where you currently stand relative to it.* That covers the reference
+     mark on a metric track, a screening threshold, a statutory deadline tick —
+     and the active-context markers (active nav item, selected queue row),
+     because "where you are" is the same statement as "where the value is".
+     It never encodes a data state (breach / review / within) and it never
+     decorates.
+
+     Primary ACTION is not indigo. It is ink (--action): a solid deep-slate
+     button reads as institutional intent, keeps indigo exclusive, and matches
+     the approved direction-B concept renders. Secondary actions stay neutral
+     surface + rule border. There is no third button kind.
+
+     FOCUS is not indigo either. Focus is an interaction state, not a position
+     against a line. It is a 2px outline in --focus (ink on light surfaces,
+     white on the dark rail and investigation room), offset 2px, which keeps
+     ≥3:1 contrast against every surface it can land on without borrowing a
+     semantic hue.
+
+   ── States ──────────────────────────────────────────────────────────────────
+   breach / review / within keep their existing meanings and their two-stop
+   structure (readable stop for text and solid fills, vivid stop for marks).
+   Two more states are added because §10.1 of the brief requires them and the
+   old palette silently lacked them:
+
+     unknown — missing or unevaluable source. Faint slate, DOTTED rule.
+     stale   — older than the declared freshness threshold. Muted slate,
+               DASHED rule plus a visible as-of time.
+
+   Neither is a fourth "urgency" colour: both are absences of knowledge, not
+   calls to act, and both are always paired with a text label in the UI
+   (colour alone never carries a state, §6.3).
+
+   ── Breakpoints ─────────────────────────────────────────────────────────────
+   CSS custom properties cannot be read inside @media queries, so viewport
+   breakpoints are documented here and written as literals where used:
+     shell sidebar collapses below 1024px; drawers replace side panels below
+     640px; the 390px phone check is the acceptance width (prompt.md §10.4).
+   Component responsiveness uses CONTAINER queries instead (prompt.md §6.2),
+   with two standard component widths: narrow < 26rem, wide ≥ 26rem.        */
+
+:root {
+  /* --- type roles (§6.1) ----------------------------------------------------
+     Stacks carry the metric-matched fallback face declared in fonts.css so the
+     swap is shift-free; system faces after it as the last resort. */
+  --font-display: "Fraunces", "Fraunces Fallback", Georgia, "Times New Roman", serif;
+  --font-body: "Manrope", "Manrope Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type scale. Operational sizes stay where the current product reads well;
+     the display size exists for the public landing page only. */
+  --type-display: clamp(2.75rem, 6vw, 4.25rem);   /* landing hero, text-art path */
+  --type-statement: 2rem;                          /* section statements, landing */
+  --type-page-title: 1.1875rem;                    /* authenticated page h1 */
+  --type-section: 0.9375rem;                       /* panel and section titles */
+  --type-body: 0.8125rem;                          /* tables, queues, forms */
+  --type-small: 0.75rem;                           /* secondary copy, captions */
+  --type-label: 0.6875rem;                         /* field and column labels */
+  --type-micro: 0.625rem;                          /* nav section headers */
+  --leading-tight: 1.15;
+  --leading-body: 1.6;
+  --tracking-tight: -0.022em;
+  --tracking-label: 0.06em;
+
+  /* --- canvas and ink ------------------------------------------------------- */
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --surface-sunk: #f1f5f9;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --muted: #64748b;
+  --faint: #94a3b8;
+  --rule: #e2e8f0;
+  --rule-strong: #cbd5e1;
+
+  /* --- institution: rail, masthead, dark rooms. Never a data state. --------- */
+  --institution: #0f172a;
+  --institution-2: #1e293b;
+  --institution-hi: #818cf8;
+
+  /* --- action and focus (see the resolution above) -------------------------- */
+  --action: #0f172a;
+  --action-hover: #1e293b;
+  --action-ink: #ffffff;
+  --focus: #0f172a;          /* light surfaces */
+  --focus-on-dark: #ffffff;  /* rail, investigation room */
+
+  /* --- the reference line: reserved, single meaning ------------------------- */
+  --reference: #4f46e5;
+  --reference-hi: #6366f1;
+  --reference-2: #eef2ff;
+  --reference-rule: #c7d2fe;
+
+  /* --- states: two stops each ---------------------------------------------- */
+  --breach: #dc2626;
+  --breach-hi: #f87171;
+  --breach-bg: #fef2f2;
+  --breach-rule: #fecaca;
+  --review: #b45309;
+  --review-hi: #fbbf24;
+  --review-bg: #fffbeb;
+  --review-rule: #fde68a;
+  --within: #047857;
+  --within-hi: #34d399;
+  --within-bg: #ecfdf5;
+  --within-rule: #a7f3d0;
+  --unknown: #94a3b8;        /* dotted rule convention */
+  --unknown-bg: #f8fafc;
+  --unknown-rule: #cbd5e1;
+  --stale: #64748b;          /* dashed rule + visible as-of time */
+  --stale-bg: #f1f5f9;
+  --stale-rule: #94a3b8;
+
+  /* --- geometry ------------------------------------------------------------- */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 3px rgba(15, 23, 42, .06);
+  --shadow-lift: 0 4px 6px -1px rgba(15, 23, 42, .07), 0 10px 20px -6px rgba(15, 23, 42, .12);
+
+  /* --- spacing scale --------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* --- density: one knob per surface kind ------------------------------------ */
+  --density-row-y: 0.6rem;          /* queue and table rows, comfortable */
+  --density-row-y-compact: 0.35rem; /* dense comparison tables */
+  --density-cell-x: 1.05rem;
+  --density-panel-pad: 1.05rem;
+
+  /* --- motion ----------------------------------------------------------------
+     Durations live in tokens so the reduced-motion override below can zero the
+     whole system in one place instead of hunting transitions per component. */
+  --motion-instant: 0.12s;   /* hover, focus, press */
+  --motion-quick: 0.16s;     /* card lift, drawer edge, row highlight */
+  --motion-deliberate: 0.4s; /* reference-mark fill, inspector open */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- stacking --------------------------------------------------------------- */
+  --z-nav: 30;
+  --z-drawer: 40;
+  --z-inspector: 45;
+  --z-modal: 50;
+  --z-palette: 60;
+  --z-toast: 70;
+}
+
+/* The whole motion system, off, in one rule. Components must use the tokens
+   above for every transition duration — a hardcoded duration escapes this. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0s;
+    --motion-quick: 0s;
+    --motion-deliberate: 0s;
+  }
+}
+
+/* The body face is the document default; the display face is opt-in per element
+   (.display-type, landing hero, text-art path) and never inherited into tables,
+   forms or panels. */
+html {
+  font-family: var(--font-body);
+}
+h1, h2, h3 {
+  letter-spacing: var(--tracking-tight);
+}

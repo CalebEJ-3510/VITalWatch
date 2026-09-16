@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tile, badge, severity_badge, ref, page_head, note %}
+{% from "_components.html" import audit_event %}
+{% block title %}{{ trial.id }} — {{ settings.app_name }}{% endblock %}
+
+{# The trial workspace (Phase 4, prompt.md §10.3): a persistent context header —
+   identity, the four independent status dimensions, as-of time, the derived
+   primary next action — and focused subviews as real, shareable URLs. Tabs are
+   legitimate here and only here: each subview is a genuine section of one
+   entity, not a lens and not a fake hierarchy. #}
+
+{% set subviews = [
+  ('overview', 'Overview', none),
+  ('enrolment', 'Enrolment', counts.enrolment),
+  ('sites', 'Sites', counts.sites),
+  ('safety', 'Safety', counts.safety),
+  ('deviations', 'Deviations', counts.deviations),
+  ('queries', 'Queries', counts.queries),
+  ('milestones', 'Milestones', counts.milestones),
+  ('activity', 'Activity', counts.activity),
+] %}
+
+{% block content %}
+
+<div class="ctx-head">
+  <div class="ctx-head-top">
+    <div class="min-w-0">
+      <h1 class="ctx-head-title">{{ trial.title }}</h1>
+      <div class="ctx-head-ids">
+        <span class="code">{{ trial.id }}</span>
+        <span>Protocol <span class="code">{{ trial.protocol_no }}</span></span>
+        <span>CTRI {% if trial.ctri_number %}<span class="code">{{ trial.ctri_number }}</span>{% else %}<strong style="color:var(--breach)">not registered</strong>{% endif %}</span>
+        <span>Phase {{ trial.phase }}</span>
+        <span>{{ trial.therapeutic_area }}</span>
+        <span>PI {{ trial.pi_name }}</span>
+      </div>
+      <div class="ctx-head-badges">
+        {{ badge('Lifecycle: ' ~ trial.status | label, 'info') }}
+        {{ badge('Operational: ' ~ trial.operational_status | label,
+                 'bad' if 'paused' in trial.operational_status or trial.operational_status == 'terminated'
+                 else 'warn' if trial.operational_status == 'under_leadership_review' else 'good') }}
+        {{ badge('Safety: ' ~ trial.safety_status | label,
+                 'bad' if trial.safety_status == 'escalated' else 'good' if trial.safety_status == 'resolved' else 'neutral') }}
+        {{ badge('Leadership: ' ~ trial.leadership_status | label,
+                 'warn' if trial.leadership_status == 'under_review' else 'good' if trial.leadership_status == 'decided' else 'neutral') }}
+      </div>
+    </div>
+    <div class="ctx-head-side">
+      <span class="ctx-head-asof">Data as of {{ as_of | dt }} UTC</span>
+      {% if next_action.href %}
+        <a class="ctx-head-action {{ 'calm' if next_action.tone == 'calm' }}" href="{{ next_action.href }}">
+          <strong>Next:</strong> {{ next_action.label }} →
+        </a>
+      {% else %}
+        <span class="ctx-head-action calm"><strong>{{ next_action.label }}</strong></span>
+      {% endif %}
+    </div>
+  </div>
+
+  <nav class="subnav" aria-label="Trial sections">
+    {% for name, text, count in subviews %}
+    <a href="/trial/{{ trial.id }}?view={{ name }}" {% if view == name %}aria-current="page"{% endif %}>
+      {{ text }}{% if count is not none %}<span class="subnav-count">{{ count }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  </nav>
+</div>
+
+{% if not trial.ctri_number and trial.status in ('enrolling', 'screening', 'follow_up') %}
+<div class="mb-4 rounded border px-4 py-3 text-sm" style="border-color:var(--breach-rule);background:var(--breach-bg);color:var(--breach)">
+  <span class="font-medium">Enrolling without a CTRI registration number.</span>
+  Prospective registration with the Clinical Trials Registry — India is mandatory before
+  the first participant is enrolled. This trial should not be recruiting.
+</div>
+{% endif %}
+
+{# ════════════════════════════ OVERVIEW ════════════════════════════ #}
+{% if view == 'overview' %}
+
+  {% set open_esc = escalations | selectattr('status', 'in', ['open', 'company_responded', 'under_leadership_review']) | list %}
+  {% if k.open_saes or unreported_major or open_esc %}
+  <section class="panel p-5 mb-4">
+    <h2 class="panel-title">Exceptions first</h2>
+    <ul class="mt-3 space-y-2 text-sm">
+      {% if k.open_saes %}
+      <li class="flex items-center gap-2">
+        {{ badge(k.open_saes ~ ' open SAE' ~ ('s' if k.open_saes != 1), 'bad') }}
+        <a href="/trial/{{ trial.id }}?view=safety" style="color:var(--reference)">review in Safety →</a>
+      </li>
+      {% endif %}
+      {% for d in unreported_major %}
+      <li class="flex items-center gap-2">
+        {{ badge('Reportable deviation unreported', 'bad') }}
+        <span style="color:var(--ink-2)">{{ d.category }} — {{ d.description }} (detected {{ d.detected_date | d }})</span>
+      </li>
+      {% endfor %}
+      {% for e in open_esc %}
+      <li class="flex items-center gap-2">
+        {{ badge(e.status | label, {'open':'warn','company_responded':'info','under_leadership_review':'bad'}.get(e.status, 'neutral')) }}
+        <a href="/escalations/{{ e.id }}" style="color:var(--reference)">{{ e.id }}</a>
+        <span style="color:var(--ink-2)">{{ e.reason }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+    {{ tile('Enrolment', k.enrolment_pct ~ '%', k.enrolled ~ ' of ' ~ k.target,
+            'bad' if k.enrolled < k.expected_by_today * 0.85 else 'good') }}
+    {{ tile('Plan to date', k.expected_by_today, 'participants expected') }}
+    {{ tile('Screen failure', k.screen_failure_rate ~ '%', 'of those screened',
+            'warn' if k.screen_failure_rate > 30 else 'neutral') }}
+    {{ tile('Visit compliance', k.visit_compliance_pct ~ '%', 'of visits due',
+            'warn' if k.visit_compliance_pct < 90 else 'good') }}
+    {{ tile('Open queries', k.open_queries, 'avg ' ~ k.open_query_ageing_days ~ ' days old',
+            'warn' if k.open_query_ageing_days > 30 else 'neutral') }}
+    {{ tile('Open SAEs', k.open_saes, 'outcome not final', 'bad' if k.open_saes else 'good') }}
+  </div>
+
+  <div class="mt-4 panel p-5">
+    <div class="flex items-baseline justify-between text-sm">
+      <span class="font-medium" style="color:var(--ink-2)">Enrolment against plan</span>
+      <span class="tabular-nums" style="color:var(--muted)">
+        {{ k.enrolled }} enrolled · {{ k.expected_by_today }} planned by today · target {{ k.target }}
+      </span>
+    </div>
+    <div class="mt-3">{{ ref(k.enrolled, k.target, k.expected_by_today) }}</div>
+    {% if k.next_milestone %}
+      <p class="mt-3 text-xs" style="color:var(--muted)">
+        Next milestone: <span class="font-medium" style="color:var(--ink)">{{ k.next_milestone | label }}</span>
+        in {{ k.days_to_next_milestone }} days —
+        <a href="/trial/{{ trial.id }}?view=milestones" style="color:var(--reference)">see the timeline →</a>
+      </p>
+    {% endif %}
+  </div>
+
+{# ════════════════════════════ ENROLMENT ════════════════════════════ #}
+{% elif view == 'enrolment' %}
+  <div class="panel p-5 mb-4">
+    <div class="flex items-baseline justify-between text-sm">
+      <span class="font-medium" style="color:var(--ink-2)">Plan against actual</span>
+      <span class="tabular-nums" style="color:var(--muted)">{{ k.enrolled }} / {{ k.target }} · plan to date {{ k.expected_by_today }}</span>
+    </div>
+    <div class="mt-3">{{ ref(k.enrolled, k.target, k.expected_by_today) }}</div>
+    <p class="mt-3 text-xs" style="color:var(--muted)">
+      The plan is a straight line across the enrolment window — crude, and honest about being
+      crude. No historical curve is drawn: dated observations are listed below, and a curve
+      is not fabricated from a single current total.
+    </p>
+  </div>
+
+  <section class="panel overflow-hidden">
+    <div class="panel-head"><span class="panel-title">Participants <span style="color:var(--faint)">({{ participants | length }})</span></span></div>
+    <div class="tbl-scroll"><table class="tbl">
+      <thead><tr><th>Code</th><th>Site</th><th>Status</th><th>Screened</th><th>Enrolled</th><th>Arm</th></tr></thead>
+      <tbody>
+        {% for p in participants %}
+        <tr>
+          <td><span class="code">{{ p.participant_code }}</span></td>
+          <td class="text-xs" style="color:var(--muted)">{{ p.site_id }}</td>
+          <td>{{ badge(p.status | label, {'enrolled':'good','screen_failed':'neutral','screening':'warn','withdrawn':'bad-soft'}.get(p.status, 'neutral')) }}</td>
+          <td class="text-xs tabular-nums" style="color:var(--muted)">{{ p.screened_date | d }}</td>
+          <td class="text-xs tabular-nums" style="color:var(--muted)">{{ p.enrolled_date | d if p.enrolled_date else '—' }}</td>
+          <td class="text-xs" style="color:var(--muted)">{{ p.arm or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="px-5 py-4 text-sm" style="color:var(--faint)">No participants on this trial yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+{# ════════════════════════════ SITES ════════════════════════════ #}
+{% elif view == 'sites' %}
+  <section class="panel overflow-hidden">
+    <div class="panel-head"><span class="panel-title">Sites <span style="color:var(--faint)">({{ sites | length }})</span></span>
+      <span class="text-xs" style="color:var(--faint)">{{ k.deviation_rate_per_site }} deviations per site</span></div>
+    <div class="tbl-scroll"><table class="tbl">
+      <thead><tr><th>Site</th><th>Investigator</th><th>Status</th><th class="num">Capacity</th><th class="num">Enrolled</th></tr></thead>
+      <tbody>
+        {% for s in sites %}
+        <tr>
+          <td>
+            <div style="color:var(--ink)">{{ s.name }}</div>
+            <div class="text-xs" style="color:var(--muted)">{{ s.city }}, {{ s.state }} · <span class="code">{{ s.id }}</span></div>
+          </td>
+          <td class="text-sm" style="color:var(--ink-2)">{{ s.pi_name }}</td>
+          <td>{{ badge(s.status | capitalize, 'good' if s.status == 'activated' else 'warn-soft') }}</td>
+          <td class="num text-xs tabular-nums" style="color:var(--muted)">{{ s.capacity }}</td>
+          <td class="num text-sm tabular-nums" style="color:var(--ink-2)">{{ s.enrolled_here }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="px-5 py-4 text-sm" style="color:var(--faint)">No sites are linked to this trial.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+{# ════════════════════════════ SAFETY ════════════════════════════ #}
+{% elif view == 'safety' %}
+  <div class="grid gap-4 lg:grid-cols-2">
+    <section class="panel">
+      <div class="panel-head"><span class="panel-title">Adverse events <span style="color:var(--faint)">({{ aes | length }})</span></span>
+        {% if current_user.role.value in ['safety_officer', 'investigator'] %}<a href="/ae?trial={{ trial.id }}" class="text-xs" style="color:var(--reference)">open in the AE queue →</a>{% endif %}</div>
+      <ul class="q-list" style="border:0;box-shadow:none;border-radius:0">
+        {% for e in aes %}
+        <li class="q-row {{ 'q-row-breach' if e.timeline_status == 'breached' else 'q-row-warn' if e.timeline_status == 'due_soon' else '' }}">
+          <span class="q-row-flag">{% if e.serious %}{{ badge('SAE', 'bad') }}{% endif %}</span>
+          <span class="q-row-main">
+            <span class="q-row-idline">
+              {% if current_user.role.value in ['safety_officer', 'investigator'] %}
+              <a class="q-row-id" href="/ae/{{ e.id }}">{{ e.id }}</a>
+              {% else %}<span class="q-row-id">{{ e.id }}</span>{% endif %}
+              <span class="q-row-ctx"><span class="code">{{ e.participant_code }}</span></span>
+            </span>
+            <span class="q-row-reason">{{ e.narrative }}</span>
+            <span class="q-row-meta">
+              {{ e.reported_at | dt }} · {{ e.severity }} ·
+              {% if e.coded_term %}{{ e.coded_term }}{% else %}uncoded{% endif %}
+            </span>
+          </span>
+        </li>
+        {% else %}
+        <li class="q-row"><span class="q-row-main"><span class="q-row-meta">No adverse events reported on this trial.</span></span></li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><span class="panel-title">Signals on this trial <span style="color:var(--faint)">({{ trial_signals | length }})</span></span>
+        {% if current_user.role.value == 'safety_officer' %}<a href="/signals?trial={{ trial.id }}" class="text-xs" style="color:var(--reference)">open in the signal queue →</a>{% endif %}</div>
+      <ul class="q-list" style="border:0;box-shadow:none;border-radius:0">
+        {% for s in trial_signals %}
+        <li class="q-row {{ 'q-row-breach' if s.flagged else '' }}">
+          <span class="q-row-flag">{{ badge('Signal', 'bad') if s.flagged else badge('Below line', 'neutral') }}</span>
+          <span class="q-row-main">
+            <span class="q-row-idline">
+              {% if current_user.role.value == 'safety_officer' %}
+              <a class="q-row-id" href="/signals/{{ s.trial_id }}/{{ s.coded_term | urlencode }}">{{ s.coded_term }}</a>
+              {% else %}<span class="q-row-id">{{ s.coded_term }}</span>{% endif %}
+              <span class="q-row-ctx code">{{ s.coded_code }}</span>
+            </span>
+            <span class="q-row-meta">
+              {{ s.cases }} case{{ '' if s.cases == 1 else 's' }}{% if s.serious %} ({{ s.serious }} serious){% endif %}
+              · PRR {{ '%.2f' | format(s.prr) ~ '×' if s.prr is not none else 'undefined — not seen elsewhere' }}
+            </span>
+          </span>
+        </li>
+        {% else %}
+        <li class="q-row"><span class="q-row-main"><span class="q-row-meta">No coded term on this trial reaches the case floor.</span></span></li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+
+{# ════════════════════════════ DEVIATIONS ════════════════════════════ #}
+{% elif view == 'deviations' %}
+  <section class="panel overflow-hidden">
+    <div class="panel-head"><span class="panel-title">Protocol deviations <span style="color:var(--faint)">({{ deviations | length }})</span></span>
+      <span class="text-xs" style="color:var(--faint)">{{ k.deviation_rate_per_site }} per site</span></div>
+    <div class="tbl-scroll"><table class="tbl">
+      <thead><tr><th>Detected</th><th>Category</th><th>Description</th><th>Severity</th><th>Reported to EC</th></tr></thead>
+      <tbody>
+        {% for d in deviations %}
+        <tr>
+          <td class="text-xs tabular-nums" style="color:var(--muted)">{{ d.detected_date | d }}</td>
+          <td style="color:var(--ink-2)">{{ d.category }}</td>
+          <td style="color:var(--muted)">{{ d.description }}</td>
+          <td>{{ severity_badge(d.severity) }}</td>
+          <td>
+            {% if d.reported_to_ec %}
+              <span class="text-xs" style="color:var(--muted)">{{ d.reported_date | d }}</span>
+            {% elif d.severity in ('major', 'critical') %}
+              {{ badge('Not reported', 'bad') }}
+            {% else %}
+              <span class="text-xs" style="color:var(--faint)">not reportable</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="px-5 py-4 text-sm" style="color:var(--faint)">No deviations recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+{# ════════════════════════════ QUERIES ════════════════════════════ #}
+{% elif view == 'queries' %}
+  <section class="panel overflow-hidden">
+    <div class="panel-head"><span class="panel-title">Data queries <span style="color:var(--faint)">({{ queries | length }})</span></span>
+      <span class="text-xs" style="color:var(--faint)">{{ counts.queries }} open · avg {{ k.open_query_ageing_days }} days old</span></div>
+    <div class="tbl-scroll"><table class="tbl">
+      <thead><tr><th>Raised</th><th>Field</th><th>Question</th><th>Participant</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for q in queries %}
+        <tr>
+          <td class="text-xs tabular-nums" style="color:var(--muted)">{{ q.raised_date | d }}</td>
+          <td class="code text-xs" style="color:var(--ink-2)">{{ q.field }}</td>
+          <td style="color:var(--muted)">{{ q.question }}</td>
+          <td class="text-xs" style="color:var(--muted)">{{ q.participant_code or '—' }}</td>
+          <td>{{ badge(q.status | capitalize, 'warn-soft' if q.status == 'open' else 'info') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="px-5 py-4 text-sm" style="color:var(--faint)">No queries on this trial.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+{# ════════════════════════════ MILESTONES ════════════════════════════ #}
+{% elif view == 'milestones' %}
+  <section class="panel p-5">
+    <h2 class="panel-title">Planned against actual, on one shared scale</h2>
+    <p class="mt-1 text-xs" style="color:var(--muted)">
+      Geometry is computed from stored dates only — a milestone with no actual date draws a
+      planned mark, never an extrapolated one. The indigo line is today: the reference every
+      planned date is measured against.
+    </p>
+    {% if milestones %}
+    <ol class="tl mt-4">
+      {% for m in milestones %}
+      <li class="tl-row">
+        <span class="tl-label">{{ m.type | label }}</span>
+        <span class="tl-track">
+          <span class="tl-today {{ 'tl-today-quiet' if not loop.first }}" style="left: {{ today_pct }}%"></span>
+          {% if m.late %}
+          <span class="tl-slip" style="left: {{ m.slip_from }}%; width: {{ [m.slip_to - m.slip_from, 0.5] | max }}%"></span>
+          {% endif %}
+          {% if m.actual_pct is not none %}
+            <span class="tl-mark tl-plan" style="left: {{ m.planned_pct }}%" title="Planned {{ m.planned }}"></span>
+            <span class="tl-mark tl-actual {{ 'late' if m.late }}" style="left: {{ m.actual_pct }}%"
+                  title="Actual {{ m.actual }}{{ ' — ' ~ m.slip_days ~ ' days late' if m.late }}"></span>
+          {% else %}
+            <span class="tl-mark tl-awaiting" style="left: {{ m.planned_pct }}%" title="Planned {{ m.planned }} — not yet achieved"></span>
+          {% endif %}
+        </span>
+        <span class="tl-when">
+          {% if m.actual %}{{ m.actual | d }}{% if m.late %} · <span style="color:var(--breach)">{{ m.slip_days }}d late</span>{% endif %}
+          {% else %}planned {{ m.planned | d }}{% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ol>
+    <div class="tl-legend">
+      <span class="lg-plan">Planned</span>
+      <span class="lg-actual">Achieved on time</span>
+      <span class="lg-late">Achieved late</span>
+      <span class="lg-awaiting">Awaiting</span>
+      <span class="lg-today">Today</span>
+    </div>
+    {% else %}
+    <p class="mt-4 text-sm" style="color:var(--faint)">No milestones are stored for this trial — the timeline is not drawn from nothing.</p>
+    {% endif %}
+  </section>
+
+{# ════════════════════════════ ACTIVITY ════════════════════════════ #}
+{% elif view == 'activity' %}
+  <section class="panel p-5">
+    <h2 class="panel-title">Recent audited activity on this trial</h2>
+    <p class="mt-1 text-xs" style="color:var(--muted)">
+      Audit events referencing the trial itself or its adverse events and escalations —
+      composed from the audit trail's resource ids, most recent first.
+      {% if current_user.role.value == 'leadership' %}<a href="/audit?q={{ trial.id }}" style="color:var(--reference)">Open in the audit center →</a>{% endif %}
+    </p>
+    {% if activity %}
+    <ol class="mt-3 space-y-1">
+      {% for a in activity %}
+      {{ audit_event(a.seq, a.actor, a.action, a.resource_id, a.timestamp_utc | dt, a.reason) }}
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="mt-3 text-sm" style="color:var(--faint)">No audit events reference this trial's records yet.</p>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% endblock %}

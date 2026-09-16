@@ -1,0 +1,959 @@
+/* VITalWatch — public landing page (Direction B: research editorial).
+   ---------------------------------------------------------------------------
+   Phase 2 (prompt.md §8). This sheet carries ONLY what the public shell adds;
+   every semantic colour, state, motion duration, radius and type role still
+   comes from tokens.css, and shared primitives (.btn, .pill, .ref, .code,
+   .label, .panel, .evidence, .audit-event, .freshness) come from app.css —
+   one design system, one component library (prompt.md §19).
+
+   What Direction B adds, and only here:
+     --paper      a warm editorial ground. Direction A keeps the cool canvas;
+                  the public page is read once and slowly, the workspace is read
+                  all day. Ink, reference, focus and every state hue are shared
+                  unchanged, so the two directions are registers of one system,
+                  not two paint jobs.
+   The display face (Fraunces) is enabled only on this page, per §6.1.       */
+
+:root {
+  --paper: #f6f4ed;
+  --paper-sunk: #eeebe1;
+  --paper-rule: #dcd7c8;
+  --paper-rule-strong: #c8c2b0;
+}
+
+body.landing {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body.landing { scroll-behavior: smooth; }
+}
+
+/* Anchored sections must clear the sticky masthead when jumped to. */
+.l-section { scroll-margin-top: 5.5rem; }
+
+/* --- type ------------------------------------------------------------------
+   The display register exists only on this page (tokens.css --font-display);
+   it never appears inside a table, form or dense panel (§6.1). */
+.display-type { font-family: var(--font-display); }
+
+.l-statement {
+  font-family: var(--font-display);
+  font-size: var(--type-statement);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+/* Small monospace metadata labels — the "LAST VERIFIED · …" text-art idea
+   (§6.1.2, item 3). Mono, letterspaced, quiet; they tie the editorial page to
+   the audit chain instead of decorating it. */
+.l-meta {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.l-meta strong { color: var(--ink-2); font-weight: 500; }
+
+/* --- masthead ----------------------------------------------------------------
+   Restrained (§8.3): mark, wordmark, six links, two actions. Below 1024px the
+   inline nav is replaced by a real disclosure drawer — never links squeezed to
+   fit. The drawer is a <details> element, so it works with JavaScript disabled;
+   landing.js only adds Escape-to-close and close-on-navigate. */
+.l-masthead {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--paper-rule);
+}
+.l-masthead-inner {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 0.7rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.l-brand { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+.l-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.l-nav { display: flex; gap: 0.15rem; margin-left: auto; }
+.l-nav a {
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 550;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: background-color var(--motion-instant) var(--ease-standard),
+              color var(--motion-instant) var(--ease-standard);
+}
+.l-nav a:hover { background: var(--paper-sunk); color: var(--ink); }
+.l-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+.l-drawer { display: none; position: relative; margin-left: auto; }
+.l-drawer > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.l-drawer > summary::-webkit-details-marker { display: none; }
+.l-drawer > summary::before {
+  content: "";
+  width: 0.95rem;
+  height: 0.65rem;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  background: linear-gradient(var(--ink), var(--ink)) 0 50% / 100% 2px no-repeat;
+}
+.l-drawer[open] > summary { background: var(--paper-sunk); }
+.l-drawer-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.6rem);
+  width: min(19rem, calc(100vw - 2.5rem));
+  background: var(--paper);
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+}
+.l-drawer-panel a {
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 550;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.l-drawer-panel a:hover { background: var(--paper-sunk); color: var(--ink); }
+.l-drawer-panel .l-drawer-cta { margin-top: 0.35rem; border-top: 1px solid var(--paper-rule); padding-top: 0.7rem; }
+
+/* --- page geometry --------------------------------------------------------- */
+.l-wrap { max-width: 76rem; margin: 0 auto; padding: 0 1.25rem; }
+.l-section { padding: 4.5rem 0 3rem; }
+.l-section + .l-section { border-top: 1px solid var(--paper-rule); }
+.l-kicker {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+.l-kicker .l-meta { color: var(--reference); }
+.l-kicker::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--paper-rule);
+  transform: translateY(-0.2rem);
+}
+.l-lede {
+  max-width: 44rem;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.l-prose { max-width: 46rem; font-size: 0.9375rem; line-height: 1.75; color: var(--ink-2); }
+.l-prose p + p { margin-top: 0.9rem; }
+.l-prose strong { color: var(--ink); font-weight: 650; }
+
+/* --- hero --------------------------------------------------------------------
+   Asymmetric editorial grid (§6.2): the thesis column is deliberately narrower
+   than the proof column, because the preview is the evidence and the evidence
+   should win the space. */
+.l-hero { padding: 4.25rem 0 3.5rem; }
+.l-hero-grid {
+  display: grid;
+  gap: 2.75rem;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: start;
+}
+.l-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.4rem;
+}
+.l-eyebrow::before {
+  content: "";
+  width: 1.75rem;
+  border-top: 2px solid var(--reference);
+}
+.l-hero h1 {
+  font-family: var(--font-display);
+  font-size: var(--type-display);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin: 0;
+}
+.l-hero-sub {
+  margin-top: 1.35rem;
+  max-width: 34rem;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.l-hero-ctas { margin-top: 1.9rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.l-hero-ctas .btn { padding: 0.65rem 1.1rem; font-size: 0.875rem; }
+.l-hero-meta { margin-top: 1.6rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; }
+
+/* --- the product preview -----------------------------------------------------
+   A high-fidelity HTML/CSS miniature of the authenticated product, built from
+   the same tokens and primitives the real screens use (§8.4.1) — not a
+   screenshot, and labelled as the synthetic fixture it is (§6.5). */
+.l-preview {
+  background: var(--canvas);           /* the product's own ground, on purpose */
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+.l-preview-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--institution);
+  color: #cbd5e1;
+}
+.l-preview-chrome .l-meta { color: #94a3b8; }
+.l-preview-chrome .pill { margin-left: auto; }
+.l-preview-body {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 0;
+}
+.l-preview-queue { padding: 0.9rem 0.9rem 1rem; border-right: 1px solid var(--rule); }
+.l-preview-queue .freshness { margin-top: 0.75rem; }
+.l-prow {
+  display: block;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.l-prow + .l-prow { margin-top: 0.5rem; }
+.l-prow-breach { border-left-color: var(--breach); }
+.l-prow-review { border-left-color: var(--review-hi); }
+.l-prow-within { border-left-color: var(--within-hi); }
+.l-prow-on {
+  border-color: var(--reference-rule);
+  box-shadow: 0 0 0 2px var(--reference-2);
+}
+.l-prow-top { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.l-prow-title { font-size: 0.8125rem; font-weight: 650; color: var(--ink); }
+.l-prow-sub { margin-top: 0.25rem; font-size: 0.75rem; color: var(--muted); }
+.l-prow .ref { margin-top: 0.5rem; }
+.l-preview-inspector { padding: 0.9rem 0.9rem 1rem; background: var(--surface-sunk); }
+.l-preview-inspector .evidence { box-shadow: none; }
+/* The inspector column is narrow; let the audit entry read as one flowing
+   statement instead of a flex row shattering mid-phrase (scoped to the
+   preview — operational pages keep the shared component's row layout). */
+.l-preview-inspector .audit-event { display: block; padding-left: 0; padding-right: 0; }
+.l-preview-inspector .audit-event-seq { margin-right: 0.4rem; }
+.l-preview-inspector .audit-event-when { margin-left: 0.4rem; }
+.l-preview figcaption {
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* --- the reference-line motif, rendered large ---------------------------------
+   The product's signature (.ref) at editorial scale (§6.1.2, item 4): the
+   landing hero graphic and the smallest status bar are the same mark. */
+.l-refmotif { margin: 3rem 0 0; }
+.l-refmotif .ref { height: 10px; }
+.l-refmotif .ref-fill { height: 10px; }
+.l-refmotif .ref-mark { top: -5px; height: 20px; width: 4px; }
+.l-refmotif .ref-legend { font-size: 0.75rem; }
+
+/* --- why: fragments converge into one case ----------------------------------- */
+.l-converge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr);
+  gap: 1.25rem;
+  align-items: center;
+  margin-top: 2.25rem;
+}
+.l-frag { display: flex; flex-direction: column; gap: 0.6rem; }
+.l-frag-item {
+  background: var(--surface);
+  border: 1px dashed var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+.l-frag-item .code { color: var(--muted); }
+.l-converge-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--faint);
+}
+.l-converge-arrow svg { display: block; }
+.l-case {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--reference);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.15rem;
+}
+.l-case-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+.l-case-row:last-child { border-bottom: 0; }
+
+/* --- what: five pillars -------------------------------------------------------- */
+.l-pillars {
+  margin-top: 2.25rem;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.l-pillar {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.05rem 1.05rem 0.95rem;
+  box-shadow: var(--shadow);
+}
+/* The fifth pillar owns a full row — audit integrity underwrites the other
+   four, so it sits beneath them, wider, like the thing they stand on. */
+.l-pillar-wide { grid-column: span 6; }
+.l-pillar h3 { margin: 0.55rem 0 0.35rem; font-size: 0.9375rem; font-weight: 650; color: var(--ink); }
+.l-pillar p { margin: 0; font-size: 0.8125rem; line-height: 1.65; color: var(--muted); }
+.l-pillar .l-pillar-link { margin-top: auto; padding-top: 0.7rem; font-size: 0.78rem; font-weight: 600; }
+.l-pillar .l-pillar-link a { color: var(--reference); text-decoration: none; }
+.l-pillar .l-pillar-link a:hover { text-decoration: underline; }
+.l-pillar-diagram {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  padding: 0.6rem 0.7rem;
+  min-height: 3.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.l-pillar-diagram .code { color: var(--ink-2); }
+
+/* --- how: the five-stage typographic path ---------------------------------------
+   The signature treatment (§6.1.2, item 1). It is an <ol> first and art second:
+   reading order is the DOM order, every stage is complete without any
+   animation, and the scroll-linked emphasis is a progressive layer behind
+   @supports + reduced-motion (§6.1.3). */
+.l-pathnav { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.6rem; }
+.l-pathnav a {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  text-decoration: none;
+}
+.l-pathnav a:hover { color: var(--ink); border-color: var(--muted); }
+
+.l-path {
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  counter-reset: stage;
+}
+.l-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 1.75rem;
+  padding: 1.9rem 0 2.1rem 2.5rem;
+  border-top: 1px solid var(--paper-rule);
+}
+.l-stage:last-child { border-bottom: 1px solid var(--paper-rule); }
+/* The connecting reference line down the left edge, with one tick per stage —
+   the path is a reference track and each stage is a position on it. */
+.l-stage::before {
+  content: "";
+  position: absolute;
+  left: 0.55rem;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--paper-rule-strong);
+}
+.l-stage::after {
+  content: "";
+  position: absolute;
+  left: 0.27rem;
+  top: 2.6rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--reference);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.l-stage-word {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4.2vw, 3rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.l-stage-word .l-stage-no {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  color: var(--reference);
+  margin-bottom: 0.5rem;
+}
+.l-stage-facts { margin: 0; display: grid; gap: 0.55rem; }
+.l-stage-facts > div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.l-stage-facts dt {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.l-stage-facts dd { margin: 0; font-size: 0.875rem; line-height: 1.6; color: var(--ink-2); }
+.l-stage-facts div.l-stage-noclaim dd { color: var(--review); }
+
+/* Scroll-linked emphasis: a progressive layer only. Unsupported browsers, no-JS
+   and reduced-motion all get the complete static list above — nothing about the
+   content depends on this animation (§6.1.3, §8.7). */
+@keyframes l-stage-in {
+  from { opacity: 0.3; }
+  to   { opacity: 1; }
+}
+@keyframes l-stage-tick {
+  from { transform: scale(0.4); }
+  to   { transform: scale(1); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .l-stage { animation: l-stage-in linear both; animation-timeline: view(); animation-range: entry 5% entry 60%; }
+    .l-stage::after { animation: l-stage-tick linear both; animation-timeline: view(); animation-range: entry 5% entry 60%; }
+  }
+}
+
+/* --- roles: the persona selector ------------------------------------------------
+   Pure HTML radio inputs, so the selector works with JavaScript disabled, is
+   keyboard-operable out of the box (arrow keys move between radios), and cannot
+   imply a permission change — it is a content selector on a public page and
+   says so. */
+.l-roles { border: 0; margin: 2.25rem 0 0; padding: 0; min-width: 0; }
+.l-roles legend {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  max-width: 46rem;
+  line-height: 1.6;
+}
+.l-role-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.l-role-label {
+  display: inline-flex;
+  margin: 0 0.4rem 0.5rem 0;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background-color var(--motion-instant) var(--ease-standard),
+              color var(--motion-instant) var(--ease-standard),
+              border-color var(--motion-instant) var(--ease-standard);
+}
+.l-role-label:hover { border-color: var(--muted); color: var(--ink); }
+.l-role-input:focus-visible + .l-role-label {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.l-role-input:checked + .l-role-label {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.l-role-panels { margin-top: 1.1rem; }
+.l-role-panel { display: none; }
+.l-role-panel-on { display: block; }
+.l-role-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.15rem 1.25rem;
+}
+.l-role-question {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+  margin: 0;
+}
+.l-role-cols {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.l-role-cols h4 {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.l-role-cols p { margin: 0; font-size: 0.8125rem; line-height: 1.6; color: var(--ink-2); }
+#l-role-vol:checked ~ .l-role-panels .l-role-panel-vol,
+#l-role-co:checked ~ .l-role-panels .l-role-panel-co,
+#l-role-inv:checked ~ .l-role-panels .l-role-panel-inv,
+#l-role-saf:checked ~ .l-role-panels .l-role-panel-saf,
+#l-role-lea:checked ~ .l-role-panels .l-role-panel-lea { display: block; }
+
+/* --- trust: properties and the monospace evidence chain ------------------------- */
+.l-trust-grid {
+  margin-top: 2.25rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.l-trust-item {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.95rem 1.05rem;
+  box-shadow: var(--shadow);
+}
+.l-trust-item h3 { margin: 0 0 0.3rem; font-size: 0.875rem; font-weight: 650; color: var(--ink); }
+.l-trust-item p { margin: 0; font-size: 0.8125rem; line-height: 1.6; color: var(--muted); }
+
+/* The monospace evidence chain (§6.1.2, item 2): a raw event record visibly
+   becomes an append-only audit row. The transformation is the argument. */
+.l-chain { margin: 2.5rem 0 0; }
+.l-chain-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.25fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+.l-chain-stage {
+  background: var(--institution);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  color: #cbd5e1;
+  overflow-x: auto;
+}
+.l-chain-stage .l-meta { color: #94a3b8; display: block; margin-bottom: 0.6rem; }
+.l-chain-stage pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.75;
+  white-space: pre;
+}
+.l-chain-stage .c-dim { color: #64748b; }
+.l-chain-stage .c-key { color: #a5b4fc; }
+.l-chain-stage .c-val { color: #e2e8f0; }
+.l-chain-stage .c-warn { color: var(--review-hi); }
+.l-chain-stage .c-ok { color: var(--within-hi); }
+.l-chain-becomes {
+  align-self: center;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.l-chain-becomes::after {
+  content: "→";
+  display: block;
+  font-size: 1.3rem;
+  margin-top: 0.25rem;
+  color: var(--reference);
+}
+.l-chain figcaption { margin-top: 0.9rem; }
+@keyframes l-chain-in {
+  from { opacity: 0.25; transform: translateY(0.5rem); }
+  to   { opacity: 1; transform: none; }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .l-chain-stage { animation: l-chain-in linear both; animation-timeline: view(); animation-range: entry 5% entry 70%; }
+  }
+}
+
+/* --- proof points ---------------------------------------------------------------- */
+.l-proof { margin-top: 2.25rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 2.5rem; }
+.l-proof li {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--paper-rule);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.l-proof li::before {
+  content: "";
+  flex-shrink: 0;
+  margin-top: 0.42rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--within-hi);
+  box-shadow: 0 0 0 3px var(--within-rule);
+}
+.l-proof li strong { color: var(--ink); font-weight: 650; }
+.l-proof-noclaim li::before { background: var(--faint); box-shadow: 0 0 0 3px var(--rule); }
+
+/* --- about & faq ------------------------------------------------------------------ */
+.l-about-grid { margin-top: 2.25rem; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 2.5rem; }
+.l-arch {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.15rem;
+}
+.l-arch h3 { margin: 0 0 0.6rem; font-size: 0.875rem; font-weight: 650; color: var(--ink); }
+.l-arch li {
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--rule);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.l-arch li:first-of-type { border-top: 0; }
+.l-arch .code { color: var(--muted); }
+
+.l-faq { margin-top: 2rem; max-width: 52rem; }
+.l-faq details {
+  border-top: 1px solid var(--paper-rule);
+  padding: 0.9rem 0;
+}
+.l-faq details:last-child { border-bottom: 1px solid var(--paper-rule); }
+.l-faq summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.l-faq summary::-webkit-details-marker { display: none; }
+.l-faq summary::after {
+  content: "+";
+  font-family: var(--font-mono);
+  color: var(--reference);
+  font-size: 1rem;
+}
+.l-faq details[open] summary::after { content: "–"; }
+.l-faq details p {
+  margin: 0.65rem 0 0;
+  max-width: 46rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+/* --- final CTA and footer ---------------------------------------------------------- */
+.l-cta {
+  background: var(--institution);
+  color: #e2e8f0;
+  padding: 4rem 0;
+}
+.l-cta h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  margin: 0;
+  max-width: 40rem;
+}
+.l-cta p { margin-top: 1rem; max-width: 38rem; font-size: 0.9375rem; line-height: 1.7; color: #cbd5e1; }
+.l-cta-row { margin-top: 1.8rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.l-cta .btn-secondary { background: transparent; color: #e2e8f0; border-color: #475569; box-shadow: none; }
+.l-cta .btn-secondary:hover { background: var(--institution-2); border-color: #64748b; color: #fff; }
+.l-cta .btn-quiet { color: #94a3b8; }
+.l-cta .btn-quiet:hover { color: #fff; background: var(--institution-2); }
+.l-cta .btn-primary { background: #f8fafc; color: var(--institution); border-color: #f8fafc; }
+.l-cta .btn-primary:hover { background: #e2e8f0; border-color: #e2e8f0; }
+.l-cta :focus-visible { outline-color: var(--focus-on-dark); }
+
+.l-footer { background: var(--institution); color: #94a3b8; border-top: 1px solid var(--institution-2); padding: 2.5rem 0 2rem; }
+.l-footer-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 3fr); gap: 2rem; }
+.l-footer h3 {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.l-footer a { color: #cbd5e1; text-decoration: none; }
+.l-footer a:hover { color: #fff; text-decoration: underline; }
+.l-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.8125rem; }
+.l-footer-brand { display: flex; align-items: center; gap: 0.55rem; }
+.l-footer-brand span { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; color: #f8fafc; }
+.l-footer-note { margin-top: 0.8rem; font-size: 0.78rem; line-height: 1.65; color: #94a3b8; max-width: 24rem; }
+.l-footer-legal {
+  margin-top: 2.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--institution-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+  font-size: 0.72rem;
+}
+.l-footer :focus-visible { outline-color: var(--focus-on-dark); }
+
+/* --- responsive ---------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .l-nav { display: none; }
+  .l-drawer { display: block; }
+  .l-actions .l-actions-signin { display: none; }
+  .l-hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .l-preview-body { grid-template-columns: minmax(0, 1fr); }
+  .l-preview-queue { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .l-pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .l-pillar, .l-pillar-wide { grid-column: span 2; }
+  .l-about-grid { grid-template-columns: minmax(0, 1fr); }
+  .l-footer-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .l-masthead-inner { padding: 0.6rem 0.8rem; gap: 0.6rem; }
+  .l-brand { gap: 0.45rem; min-width: 0; }
+  .l-brand-name { font-size: 1.1rem; white-space: nowrap; }
+  .l-actions .btn { padding: 0.45rem 0.7rem; font-size: 0.8125rem; }
+  .l-drawer > summary { padding: 0.45rem 0.6rem; font-size: 0; gap: 0; } /* icon-only at phone width; aria-label carries the name */
+  .l-drawer > summary::before { margin: 0.1rem; }
+  .l-section { padding: 3rem 0 2.25rem; }
+  .l-hero { padding: 2.75rem 0 2.5rem; }
+  .l-converge { grid-template-columns: minmax(0, 1fr); }
+  .l-converge-arrow { flex-direction: row; justify-content: center; }
+  .l-converge-arrow svg { transform: rotate(90deg); }
+  .l-pillars { grid-template-columns: minmax(0, 1fr); }
+  .l-pillar, .l-pillar-wide { grid-column: span 1; }
+  .l-stage { grid-template-columns: minmax(0, 1fr); gap: 0.9rem; padding-left: 1.9rem; }
+  .l-stage::before { left: 0.35rem; }
+  .l-stage::after { left: 0.07rem; top: 2.35rem; }
+  .l-stage-facts > div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+  .l-role-cols { grid-template-columns: minmax(0, 1fr); }
+  .l-trust-grid { grid-template-columns: minmax(0, 1fr); }
+  .l-chain-track { grid-template-columns: minmax(0, 1fr); }
+  .l-chain-becomes::after { content: "↓"; }
+  .l-proof { grid-template-columns: minmax(0, 1fr); }
+  .l-footer-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* =============================================================================
+   Phase 6 — motion & reveal layer (prompt.md §8.7, §13.3; blueprint §8 "motion
+   budget"). Three independent mechanisms, each with its own fallback:
+
+     1. LOAD choreography (hero + preview): pure CSS keyframes — works with
+        JavaScript disabled. Fenced behind prefers-reduced-motion:
+        no-preference, so reduced motion renders the final state instantly.
+     2. SCROLL reveal ([data-reveal]): JS-gated (html.ljs) so a no-JS browser
+        never sees hidden content; IO-less browsers get everything revealed
+        immediately by landing.js's fallback; reduced motion never hides.
+     3. STATE motion (role panels, chip hover): pure CSS, content never
+        depends on the animation completing.
+
+   Nothing on this page moves content, hijacks scroll, or communicates by
+   motion alone — every animated element is fully readable with all motion
+   disabled (§16 Phase 6 exit gate). */
+
+/* --- masthead: scroll progress + condensed state ----------------------------- */
+.l-masthead { position: sticky; }
+.l-progress {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 2px;
+  width: 100%;
+  background: var(--reference);
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+.l-masthead {
+  transition: box-shadow var(--motion-quick) var(--ease-standard),
+              background-color var(--motion-quick) var(--ease-standard);
+}
+.l-masthead.l-scrolled {
+  box-shadow: 0 1px 0 var(--paper-rule), 0 6px 18px -12px rgba(15, 23, 42, 0.25);
+}
+
+/* --- load choreography (pure CSS — no JavaScript required) -------------------- */
+@keyframes l-rise {
+  from { opacity: 0; transform: translateY(0.7rem); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes l-line-up {
+  from { transform: translateY(112%); }
+  to   { transform: none; }
+}
+@keyframes l-grow-fill {
+  from { width: 0; }
+}
+
+.l-hero-line { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.l-hero-line > span { display: inline-block; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .l-eyebrow { animation: l-rise 0.5s var(--ease-standard) both; }
+  .l-hero-line > span { animation: l-line-up 0.72s var(--ease-standard) both; }
+  .l-hero-line:nth-child(2) > span { animation-delay: 0.14s; }
+  .l-hero-line:nth-child(3) > span { animation-delay: 0.28s; }
+  .l-hero-sub  { animation: l-rise 0.55s var(--ease-standard) 0.38s both; }
+  .l-hero-ctas { animation: l-rise 0.55s var(--ease-standard) 0.48s both; }
+  .l-hero-meta { animation: l-rise 0.55s var(--ease-standard) 0.58s both; }
+  .l-refmotif  { animation: l-rise 0.55s var(--ease-standard) 0.66s both; }
+  .l-refmotif .ref-fill { animation: l-grow-fill 1s var(--ease-standard) 0.8s both; }
+
+  /* The product preview rises into the first viewport and settles its shadow;
+     inside it, the reference track fills once, on load. */
+  [data-hero] {
+    animation: l-rise 0.7s var(--ease-standard) 0.3s both;
+  }
+  [data-hero] .ref-fill { animation: l-grow-fill 1.1s var(--ease-standard) 0.9s both; }
+
+  /* The breached row carries a soft, slow pulse on its left edge — a
+     decorative emphasis only; the state is already carried by the filled
+     "Breached" pill and the row label, never by this motion (§6.3). */
+  @keyframes l-breach-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    50%      { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14); }
+  }
+  .l-prow-breach { animation: l-breach-pulse 2.6s var(--ease-standard) 1.6s infinite; }
+}
+
+/* --- scroll reveal (JS-gated — invisible without html.ljs) --------------------
+   The hidden state exists ONLY when all three hold: scripting on (html.ljs),
+   no reduced-motion preference, and the element not yet revealed. Any failure
+   in landing.js therefore degrades to "content visible", never "content
+   stuck hidden". */
+@media (prefers-reduced-motion: no-preference) {
+  html.ljs [data-reveal] {
+    opacity: 0;
+    transform: translateY(0.9rem);
+  }
+  html.ljs [data-reveal].l-in {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.55s var(--ease-standard) calc(var(--d, 0) * 70ms),
+                transform 0.55s var(--ease-standard) calc(var(--d, 0) * 70ms);
+  }
+  /* The converge arrow's dashes march rightward once revealed — the diagram's
+     direction is also stated in its accessible name, not carried by motion. */
+  @keyframes l-march {
+    to { stroke-dashoffset: -14; }
+  }
+  html.ljs .l-converge-arrow.l-in svg path {
+    animation: l-march 0.9s linear infinite;
+  }
+  /* The evidence chain's "becomes" nudges the eye across the transformation. */
+  @keyframes l-nudge {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(0.3rem); }
+  }
+  html.ljs .l-chain-becomes.l-in::after {
+    animation: l-nudge 1.8s var(--ease-standard) infinite;
+  }
+}
+
+/* --- persona panel switching (pure CSS — no JavaScript required) ----------------
+   The panels are shown by the :checked radio rules above; running the entrance
+   keyframe on that same state change makes the switch visible without any
+   scripting, and the panel content is complete with the animation removed. */
+@keyframes l-panel-in {
+  from { opacity: 0; transform: translateY(0.45rem); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  #l-role-vol:checked ~ .l-role-panels .l-role-panel-vol,
+  #l-role-co:checked ~ .l-role-panels .l-role-panel-co,
+  #l-role-inv:checked ~ .l-role-panels .l-role-panel-inv,
+  #l-role-saf:checked ~ .l-role-panels .l-role-panel-saf,
+  #l-role-lea:checked ~ .l-role-panels .l-role-panel-lea {
+    animation: l-panel-in 0.35s var(--ease-standard);
+  }
+}
+
+/* --- the ticking fixture clock ---------------------------------------------------
+   landing.js counts the SAE clock up from its labelled fixture value. The
+   ticking digits get tabular figures so the row never reflows; the static
+   text is complete without the enhancement. */
+[data-tick] { font-variant-numeric: tabular-nums; }

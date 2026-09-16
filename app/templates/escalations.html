@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, severity_badge, page_head, note %}
+{% from "_queue.html" import queue_toolbar, queue_summary, queue_empty, pagination %}
+{% block title %}Escalations — {{ settings.app_name }}{% endblock %}
+
+{# The escalation inbox as a worklist (Phase 4, §10.2). The old status-chip row
+   is superseded by allowlisted, combinable, URL-preserved filters; the Company
+   role's scope cut still happens server-side before the queue sees a row. #}
+
+{% block content %}
+{% call page_head('Escalation inbox',
+        'Protocol-deviation and safety-concern escalations — one entity, distinguished by type and raiser role.') %}
+  {% if can_raise %}<a href="/escalations/new" class="btn btn-primary">Raise escalation</a>{% endif %}
+{% endcall %}
+
+{{ queue_toolbar('/escalations', result, spec.filters, spec.sorts, spec.search_label, dynamic_options) }}
+{{ queue_summary(result, '/escalations', 'escalations') }}
+
+{% if result.rows %}
+<ul class="q-list" aria-label="Escalation queue">
+  {% for e in result.rows %}
+  <li class="q-row {{ 'q-row-breach' if e.status == 'under_leadership_review' else 'q-row-warn' if e.status == 'open' else '' }}">
+    <span class="q-row-flag">
+      {{ badge(e.status | label, {'open':'warn','company_responded':'info','under_leadership_review':'bad',
+                                   'resolved':'good','closed':'neutral'}.get(e.status, 'neutral')) }}
+    </span>
+    <span class="q-row-main">
+      <span class="q-row-idline">
+        <a class="q-row-id" href="/escalations/{{ e.id }}">{{ e.id }}</a>
+        <span class="q-row-ctx">
+          {{ e.escalation_type | label }} ·
+          <a href="/trial/{{ e.trial_id }}">{{ e.trial_id }}</a>
+          {% set t = trials.get(e.trial_id) %}{# dict.get on the real dict, subscript on the Row #}
+          {% if t %}— {{ t['title'] }}{% endif %}
+        </span>
+        {{ severity_badge(e.severity) }}
+      </span>
+      <span class="q-row-reason">{{ e.reason }}</span>
+      <span class="q-row-meta">
+        raised by {{ e.raised_by }} ({{ e.raised_by_role | label }}) · {{ e.created_at | dt }}
+        {% if e.leadership_decision %}· decided: {{ e.leadership_decision | label }}{% endif %}
+      </span>
+    </span>
+    <span class="q-row-state">
+      {% if e.deadline %}
+        <span class="q-row-due {{ 'q-row-due-bad' if e.status == 'open' }}">respond by {{ e.deadline | dt }}</span>
+      {% elif e.escalation_type == 'safety_concern' %}
+        <span class="q-row-due">statutory clock {{ settings.statutory_clock_hours }}h</span>
+      {% else %}
+        <span class="q-row-due">no statutory clock</span>
+      {% endif %}
+      <a class="q-row-action" href="/escalations/{{ e.id }}">Open package →</a>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{{ pagination('/escalations', result) }}
+{% else %}
+{{ queue_empty(result, '/escalations', 'escalations',
+               'No escalations raised.',
+               'An Investigator raises a protocol deviation; a Safety Officer raises a safety concern. Raising either pauses the trial.') }}
+{% endif %}
+
+{% call note('How this workflow closes the loop') %}
+  <p>Raising either type pauses the trial; a safety concern additionally starts a statutory
+  response clock ({{ settings.statutory_clock_hours }}h, configurable). The Company responds with a
+  structured record; the raiser reviews it and either resumes the trial or escalates to
+  Leadership, who records the final governance decision with a mandatory reason.</p>
+{% endcall %}
+
+{% endblock %}

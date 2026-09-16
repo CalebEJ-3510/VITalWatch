@@ -1,0 +1,814 @@
+/* VITalWatch — visual system.
+   ---------------------------------------------------------------------------
+   The premise this design is built on: in clinical oversight no value means
+   anything on its own. Enrolment is read against the plan to date, a reporting
+   clock against a statutory deadline, a proportional reporting ratio against a
+   screening threshold. The number is never the finding — the distance from the
+   line is.
+
+   So one colour is reserved, everywhere and exclusively, for *the line you are
+   measured against*: --reference, electric indigo. It is never decorative and
+   never a state. That gives the product a signature mark (.ref, below) which
+   carries the same meaning on every screen, and it keeps the brand colour out of
+   the way of the three colours the domain has already spoken for: breach,
+   review, within tolerance.
+
+   Urgency is filled, status is tinted. A badge with a solid colour behind it is
+   asking for an action; a badge with a tint behind it is stating a fact. That
+   single rule is why the attention centre reads at a glance and a status column
+   does not shout.
+
+   Surfaces are white cards on a cool-grey canvas, lifted on soft shadow rather
+   than hairlines. Identifiers stay in mono because in a system with no patient
+   names, the code *is* the record. */
+
+/* Tokens live in tokens.css — the single source of truth since Phase 1.
+   This file consumes them and must not redefine them. The palette history and
+   the indigo-resolution rationale are documented there. */
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-feature-settings: "cv05", "ss01";
+}
+
+/* Figures line up in columns across every card and row. */
+.tabular-nums,
+.metric-value,
+.tbl .num,
+.code { font-variant-numeric: tabular-nums; }
+
+/* --- Tailwind slate compatibility --------------------------------------------
+   The templates were written against Tailwind's slate scale. Rather than edit a
+   colour into eleven files, the scale is remapped onto the tokens once, here, so
+   the palette has exactly one definition. Two-class specificity so it wins over
+   the CDN's injected sheet regardless of which order the two land in. */
+body .text-slate-900, body .text-slate-800 { color: var(--ink); }
+body .text-slate-700, body .text-slate-600 { color: var(--ink-2); }
+body .text-slate-500 { color: var(--muted); }
+body .text-slate-400, body .text-slate-300 { color: var(--faint); }
+body .border-slate-200, body .divide-slate-100 > * + * { border-color: var(--rule); }
+body .border-slate-300 { border-color: var(--rule-strong); }
+body .bg-slate-50 { background: var(--surface-sunk); }
+body .text-emerald-700 { color: var(--within); }
+
+/* --- identifiers -------------------------------------------------------------
+   Every study id, subject code, protocol number, CTRI number, controlled term
+   and hash is set this way, so a coded identifier is recognisable as one before
+   it is read. */
+.code {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .875em;
+  letter-spacing: -.01em;
+  /* A 64-character hash offers no break opportunity, so without this it sets the
+     minimum width of every box it sits in, and the page inherits that width. */
+  overflow-wrap: anywhere;
+}
+
+/* --- section labels --- */
+.label {
+  font-size: .6875rem; font-weight: 600;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* --- buttons: one primary, one secondary, one quiet. No fourth kind. --- */
+.btn {
+  display: inline-flex; align-items: center; gap: .375rem;
+  border-radius: var(--radius-sm); padding: .45rem .85rem;
+  font-size: .8125rem; font-weight: 600; line-height: 1.25rem;
+  white-space: nowrap; cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease,
+              box-shadow .14s ease, transform .14s ease;
+}
+/* Primary action is ink, not indigo: indigo is reserved for the reference line
+   and active context (tokens.css, "the indigo question"). */
+.btn-primary { background: var(--action); color: var(--action-ink); border: 1px solid var(--action); box-shadow: var(--shadow); }
+.btn-primary:hover { background: var(--action-hover); border-color: var(--action-hover); box-shadow: var(--shadow-lift); }
+.btn-secondary { background: var(--surface); color: var(--ink-2); border: 1px solid var(--rule-strong); box-shadow: var(--shadow); }
+.btn-secondary:hover { background: var(--surface-sunk); border-color: var(--muted); color: var(--ink); }
+.btn-quiet { color: var(--muted); border: 1px solid transparent; padding: .45rem .6rem; }
+.btn-quiet:hover { color: var(--ink); background: var(--surface-sunk); }
+.btn:active { transform: translateY(1px); }
+
+/* Keyboard focus is visible on everything. It is ink on light surfaces and
+   white on the dark rail and investigation room — an interaction state, never
+   a semantic hue (tokens.css, "the indigo question"). */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.sidebar :focus-visible,
+.inv :focus-visible { outline-color: var(--focus-on-dark); }
+
+/* --- form fields --- */
+.field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  padding: .4rem .7rem;
+  font-size: .8125rem;
+  color: var(--ink);
+}
+.field:focus { border-color: var(--reference); outline: none; box-shadow: 0 0 0 3px var(--reference-2); }
+.field-label { display: block; }
+.field-label > .label { display: block; margin-bottom: .25rem; }
+
+/* --- panels: the standard surface --- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.panel-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: .25rem 1rem;
+  padding: .75rem 1.05rem; border-bottom: 1px solid var(--rule);
+}
+/* Flex items refuse to shrink below their content by default; without this a long
+   caption sets the width of the page it sits on. */
+.panel-head > * { min-width: 0; }
+.panel-title { font-size: .875rem; font-weight: 650; color: var(--ink); letter-spacing: -.011em; }
+
+/* --- metrics ---------------------------------------------------------------
+   The figure is the loudest thing on the card and the only thing set at that
+   size, so a reader scanning six cards reads six numbers and nothing else. Tone
+   is carried by a coloured left edge rather than a full border: it marks the
+   card without tinting it, which keeps the number on white at full contrast. */
+.metric {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  box-shadow: var(--shadow);
+  transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease;
+}
+a.metric:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+.metric-value {
+  font-size: 2.125rem; font-weight: 700; line-height: 1.05;
+  letter-spacing: -.032em; color: var(--ink);
+}
+.metric-sub { margin-top: .4rem; font-size: .75rem; line-height: 1.5; color: var(--muted); }
+.metric-breach { border-left-color: var(--breach); }
+.metric-review { border-left-color: var(--review-hi); }
+.metric-within { border-left-color: var(--within-hi); }
+.metric-breach .metric-value { color: var(--breach); }
+
+/* --- the reference mark ------------------------------------------------------
+   The signature. A value on its track, with one indigo tick at the line that
+   makes the value mean something: plan-to-date, a screening threshold, a
+   statutory deadline. The tick has a white casing so it stays crisp whether it
+   lands on the gradient or on the empty track — a marker you cannot see on the
+   half of the bar that matters is not a marker. */
+.ref { position: relative; height: 8px; background: var(--rule); border-radius: 999px; }
+.ref-fill {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--reference-hi), var(--reference));
+  transition: width .4s cubic-bezier(.4,0,.2,1);
+}
+.ref-fill-breach { background: linear-gradient(90deg, var(--breach-hi), var(--breach)); }
+.ref-fill-review { background: linear-gradient(90deg, var(--review-hi), var(--review)); }
+.ref-fill-within { background: linear-gradient(90deg, var(--within-hi), var(--within)); }
+.ref-mark {
+  position: absolute; top: -4px; width: 3px; height: 16px;
+  background: var(--ink); border-radius: 2px;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.ref-mark::after {
+  content: ""; position: absolute; left: 50%; top: -4px;
+  width: 5px; height: 5px; margin-left: -2.5px; border-radius: 999px;
+  background: var(--reference); box-shadow: 0 0 0 1.5px #fff;
+}
+.ref-legend { margin-top: .35rem; display: flex; justify-content: space-between; font-size: .6875rem; color: var(--faint); }
+.ref-legend .at { color: var(--reference); font-weight: 600; }
+
+/* --- status pills -------------------------------------------------------------
+   Urgency is filled, status is tinted. Breach and review are things somebody has
+   to act on, so they carry a solid fill and white type; within-tolerance and
+   neutral are statements of fact and stay quiet. */
+.pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  border-radius: 999px; padding: .12rem .55rem;
+  font-size: .6875rem; font-weight: 600; line-height: 1.45;
+  letter-spacing: .005em; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.pill-breach  { background: var(--breach); color: #fff; border-color: var(--breach); }
+.pill-review  { background: var(--review); color: #fff; border-color: var(--review); }
+.pill-within  { background: var(--within-bg); color: var(--within); border-color: var(--within-rule); }
+.pill-neutral { background: var(--surface-sunk); color: var(--ink-2); border-color: var(--rule); }
+.pill-ref     { background: var(--reference-2); color: var(--reference); border-color: var(--reference-rule); }
+/* Severity is an attribute of an event, not a call to act on it — a column of six
+   filled crimson pills is six times nothing. These carry the same hue at tint
+   strength, so the filled badges elsewhere in the row keep their meaning. */
+.pill-breach-soft { background: var(--breach-bg); color: var(--breach); border-color: var(--breach-rule); }
+.pill-review-soft { background: var(--review-bg); color: var(--review); border-color: var(--review-rule); }
+
+/* --- the attention centre ------------------------------------------------------
+   An alert list is not a table of rows that happen to be coloured; it is a queue
+   ordered by urgency. Each row carries its severity twice — once as a filled
+   badge and once as a coloured left edge — so the shape of the queue is legible
+   before a single word of it is read. */
+.alert {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem;
+  padding: .7rem 1.05rem .7rem .85rem;
+  border-left: 4px solid var(--rule-strong);
+  font-size: .8125rem;
+  transition: background-color .14s ease;
+}
+.alert:hover { background: var(--surface-sunk); }
+.alert-critical { border-left-color: var(--breach); background: linear-gradient(90deg, var(--breach-bg), transparent 55%); }
+.alert-critical:hover { background: var(--breach-bg); }
+.alert-warning  { border-left-color: var(--review-hi); background: linear-gradient(90deg, var(--review-bg), transparent 55%); }
+.alert-warning:hover { background: var(--review-bg); }
+.alert-study { font-weight: 650; color: var(--ink); }
+.alert-study:hover { color: var(--reference); }
+.alert-rule { margin-left: auto; font-size: .6875rem; color: var(--faint); white-space: nowrap; }
+
+/* --- the urgent strip on the overview ---------------------------------------
+   Filled badge, dark type on a crimson-tinted card, each count a link. The old
+   version set every word in crimson on crimson, which is the colour of urgency
+   spent on nothing in particular. */
+.urgent {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem;
+  padding: .8rem 1.05rem;
+  background: var(--surface);
+  border: 1px solid var(--breach-rule);
+  border-left: 4px solid var(--breach);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.urgent-title { font-size: .875rem; font-weight: 650; color: var(--ink); }
+.urgent-items { display: flex; flex-wrap: wrap; gap: .4rem .5rem; margin-left: auto; }
+.urgent-item {
+  font-size: .8125rem; font-weight: 500; color: var(--breach);
+  background: var(--breach-bg); border: 1px solid var(--breach-rule);
+  border-radius: 999px; padding: .15rem .7rem;
+  transition: background-color .14s ease, color .14s ease;
+}
+.urgent-item:hover { background: var(--breach); color: #fff; border-color: var(--breach); }
+
+/* Any panel that is itself a link. */
+.card-lift { transition: box-shadow .16s ease, transform .16s ease, border-color .16s ease; }
+.card-lift:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); border-color: var(--rule-strong); }
+
+/* --- tables: dense. Clinical data is read in bulk, not admired. --- */
+.tbl { width: 100%; font-size: .8125rem; border-collapse: collapse; }
+.tbl thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: .55rem 1.05rem; text-align: left;
+  font-size: .6875rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); background: var(--surface-sunk); border-bottom: 1px solid var(--rule);
+}
+.tbl tbody td { padding: .6rem 1.05rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tbl tbody tr:nth-child(even) { background: #fbfcfe; }
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover { background: var(--reference-2); }
+.tbl .num { text-align: right; }
+/* Study titles are long and the reference mark needs room to be read; without a
+   floor on these two the numeric columns win the auto-layout and the title column
+   wraps to six lines. */
+.tbl .cell-title { min-width: 13rem; }
+.tbl .cell-ref { min-width: 10.5rem; }
+/* A row that is itself a breach, not a row containing one. */
+.tbl tbody tr.row-breach { background: var(--breach-bg); }
+.tbl tbody tr.row-breach:hover { background: #fee2e2; }
+
+/* --- the disclosure that replaced five essays --- */
+.note > summary {
+  cursor: pointer; list-style: none;
+  font-size: .78rem; font-weight: 500; color: var(--muted); padding: .25rem 0;
+}
+.note > summary::-webkit-details-marker { display: none; }
+.note > summary::before { content: "＋ "; font-size: .7rem; color: var(--reference); }
+.note[open] > summary::before { content: "－ "; }
+.note > summary:hover { color: var(--ink); }
+.note-body {
+  margin-top: .375rem; max-width: 64ch;
+  font-size: .78rem; line-height: 1.65; color: var(--muted);
+}
+.note-body p + p { margin-top: .5rem; }
+
+/* --- tabs --- */
+.tab {
+  padding: .5rem .125rem; margin-bottom: -1px;
+  font-size: .8125rem; font-weight: 500; color: var(--faint);
+  border-bottom: 2px solid transparent;
+}
+.tab:hover { color: var(--ink-2); }
+.tab-on { color: var(--ink); border-bottom-color: var(--reference); }
+
+/* --- left rail: the masthead ------------------------------------------------
+   Deep slate rather than mid-navy: the rail is the anchor the white canvas is
+   read against, and the more contrast it holds the more the cards lift off the
+   page. Indigo is the active marker here too, which is the one place the
+   reference colour is allowed to mean "you are here" rather than "the line". */
+.sidebar {
+  display: flex; flex-direction: column;
+  width: 15rem; flex-shrink: 0;
+  background: var(--institution);
+  border-right: 1px solid var(--institution-2);
+}
+.nav-section {
+  padding: 1rem .85rem .35rem;
+  font-size: .625rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: #64748b;
+}
+.nav-link {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  border-radius: var(--radius-sm); padding: .45rem .8rem; margin-bottom: 2px;
+  font-size: .8125rem; font-weight: 500; color: #cbd5e1;
+  border-left: 3px solid transparent;
+  transition: background-color .14s ease, color .14s ease;
+}
+.nav-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-on {
+  background: linear-gradient(90deg, rgba(99,102,241,.22), rgba(99,102,241,.06));
+  color: #fff; border-left-color: var(--institution-hi); font-weight: 600;
+}
+.nav-badge {
+  min-width: 1.35rem; text-align: center;
+  border-radius: 999px; padding: 0 .4rem;
+  font-size: .625rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--breach); color: #fff;
+}
+
+/* --- investigation room -------------------------------------------------------
+   The one screen that changes ground colour, and that is the point: stepping
+   into it should feel like stepping into a different room, so the reader knows a
+   mode changed without being told. Same reserved semantics — red is an actual
+   safety finding, amber is "a human should look", indigo is still the line. */
+.inv {
+  background: #0b1220;
+  color: #cbd5e1;
+  margin: -1.5rem -2rem;
+  padding: 1.5rem 2rem 2.5rem;
+  min-height: calc(100vh - 3rem);
+}
+.inv h1, .inv h2, .inv h3 { color: #f1f5f9; }
+.inv-rule { border: 0; border-top: 1px solid #1e293b; margin: 1.75rem 0; }
+.inv-eyebrow {
+  font-size: .6875rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--institution-hi); font-weight: 600;
+}
+
+.ev {
+  background: #111c33; border: 1px solid #1e293b; border-radius: var(--radius);
+  overflow: hidden; transition: border-color .15s, box-shadow .15s;
+}
+.ev[open] { border-color: #3b4c6b; box-shadow: 0 10px 24px -12px rgba(0,0,0,.6); }
+.ev > summary {
+  cursor: pointer; list-style: none; padding: .85rem 1.05rem;
+  display: flex; align-items: center; gap: .75rem;
+}
+.ev > summary::-webkit-details-marker { display: none; }
+.ev > summary:hover { background: #16233d; }
+.ev-num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .5625rem; letter-spacing: .11em; color: #64748b;
+}
+.ev-title { color: #e2e8f0; font-size: .9375rem; font-weight: 600; }
+.ev-open { margin-left: auto; font-size: .6875rem; font-weight: 600; color: var(--institution-hi); }
+.ev[open] .ev-open::after { content: "close"; }
+.ev:not([open]) .ev-open::after { content: "open"; }
+.ev-body { padding: 0 1.05rem 1.25rem; font-size: .8125rem; line-height: 1.65; }
+
+/* Documents sit on paper inside the dark room, because a document is a document. */
+.doc {
+  background: var(--surface); color: var(--ink-2); border-radius: var(--radius-sm);
+  padding: .875rem 1rem; font-size: .8125rem; line-height: 1.65;
+}
+.doc-src { font-size: .6875rem; color: var(--muted); }
+
+.pt {
+  background: var(--surface); color: var(--ink); border-radius: var(--radius-sm);
+  padding: .75rem .95rem; border-left: 4px solid var(--rule-strong);
+}
+.pt-linked { border-left-color: var(--breach); }
+.inv-cluster[open] .pt { animation: draw-together .45s ease-out both; }
+.inv-cluster[open] .pt:nth-child(2) { animation-delay: .09s; }
+.inv-cluster[open] .pt:nth-child(3) { animation-delay: .18s; }
+@keyframes draw-together {
+  from { opacity: .35; transform: translateY(-10px) scale(.97); }
+  to   { opacity: 1;   transform: none; }
+}
+
+.ind { border: 1px solid #1e293b; border-radius: var(--radius); padding: .95rem 1.05rem; background: #111c33; }
+.ind-red   { border-color: #7f1d1d; background: #1c1417; }
+.ind-amber { border-color: #78350f; background: #1c1712; }
+.ind-green { border-color: #065f46; background: #101d1a; }
+.ind-dot { width: .5rem; height: .5rem; border-radius: 999px; display: inline-block; }
+.ind-red   .ind-dot { background: var(--breach-hi); box-shadow: 0 0 0 3px rgba(248,113,113,.18); }
+.ind-amber .ind-dot { background: var(--review-hi); box-shadow: 0 0 0 3px rgba(251,191,36,.18); }
+.ind-green .ind-dot { background: var(--within-hi); box-shadow: 0 0 0 3px rgba(52,211,153,.18); }
+
+.rank { font-variant-numeric: tabular-nums; }
+.rank-row { display: flex; gap: .5rem; align-items: baseline; padding: .35rem 0; border-bottom: 1px solid #1e293b; }
+.rank-row:last-child { border-bottom: 0; }
+.rank-n {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: #64748b; font-size: .625rem; width: 1.25rem;
+}
+.chip {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .5625rem; padding: .1rem .45rem; border-radius: 999px;
+  letter-spacing: .03em; background: #1e293b; color: #94a3b8;
+}
+.chip-both { background: #1e3a8a; color: #bfdbfe; }
+.chip-concept { background: #312e81; color: #c7d2fe; }
+.chip-lex { background: #164e63; color: #a5f3fc; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  a.metric:hover { transform: none; }
+}
+
+/* --- narrow viewports ---------------------------------------------------------
+   A fixed 15rem rail beside a dense table pushes the page sideways on a phone, and
+   a page that scrolls horizontally is a page nobody can read. Below 900px the rail
+   becomes a scrolling strip along the top and wide tables scroll inside their own
+   panel rather than dragging the document with them. */
+@media (max-width: 900px) {
+  .app-shell { flex-direction: column; }
+
+  /* Phase 3 (§9.2): below the shell breakpoint the rail is replaced by the
+     topbar's navigation drawer — a real, keyboard-reachable menu (native
+     <details>, so it works with JS disabled) instead of a squeezed strip of
+     horizontal links. The drawer carries the same captured nav markup, the
+     user block and logout, so nothing the rail offered is lost. */
+  .sidebar { display: none; }
+
+  main { padding-left: 1rem !important; padding-right: 1rem !important; }
+  /* Grid and flex items default to min-width:auto and refuse to shrink below their
+     content, which is how one long cell drags a whole page sideways. */
+  main * { min-width: 0; }
+  /* The retrieval query box asks for 22rem, which is wider than a phone. */
+  .inv input[type="text"], .inv input:not([type]) { min-width: 0 !important; }
+  .inv { margin: -1.5rem -1rem; padding: 1.5rem 1rem 2.5rem; }
+
+  /* Wide tables scroll inside their own wrapper, so the document keeps its width. */
+  .tbl { min-width: 40rem; }
+  .tbl thead th { position: static; }
+  .metric-value { font-size: 1.875rem; }
+}
+
+/* Every .tbl is wrapped in one of these. Above the mobile breakpoint it is inert. */
+.tbl-scroll { overflow-x: auto; }
+
+/* Below 640px every multi-column grid collapses to one column. Two metric cards
+   side by side on a phone leaves neither readable, and a grid whose items will not
+   shrink is what drags the document wider than the screen. */
+@media (max-width: 640px) {
+  main .grid { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+/* The shell is pinned to the viewport so that no single stubborn descendant can set
+   the width of the whole document. Deliberately no `overflow-x: hidden` here — that
+   hides the symptom by clipping real content, and the causes are fixed above:
+   identifiers wrap, grid and flex items may shrink, wide tables scroll in their own
+   wrapper, and the rail is a scrolling strip rather than a wrapping block. */
+@media (max-width: 900px) {
+  .app-shell { width: 100vw; max-width: 100vw; }
+  .app-shell > * { max-width: 100vw; }
+}
+
+/* --- Phase 1 component layer ------------------------------------------------
+   Styles for the macros in _components.html. Colours, radii and durations come
+   from tokens.css; nothing here introduces a new hue. */
+
+.notice-synthetic {
+  display: flex; align-items: flex-start; gap: .5rem;
+  margin-bottom: 1rem; padding: .65rem .9rem;
+  border: 1px solid var(--review-rule); border-left: 4px solid var(--review-hi);
+  border-radius: var(--radius-sm); background: var(--review-bg);
+  font-size: .78rem; line-height: 1.55; color: #78350f;
+}
+.notice-synthetic strong { font-weight: 650; }
+.notice-synthetic-dot {
+  flex-shrink: 0; margin-top: .35rem; width: .4rem; height: .4rem;
+  border-radius: 999px; background: var(--review-hi);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, .2);
+}
+.notice-synthetic-line { min-width: 0; }
+.notice-synthetic-more { display: inline; }
+.notice-synthetic-more > summary {
+  display: inline; margin-left: .35rem; cursor: pointer;
+  color: var(--reference); font-weight: 600; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.notice-synthetic-more > summary:hover { color: var(--ink); }
+.notice-synthetic-more[open] > summary { display: list-item; margin: .3rem 0 0; }
+.notice-synthetic-body { margin-top: .35rem; display: grid; gap: .3rem; }
+.notice-synthetic-body p { margin: 0; }
+
+/* Stack the two footer trust lines where there is no flex row (e.g. login). */
+.trust-stack span { display: block; }
+
+.state {
+  padding: 1.5rem var(--density-panel-pad);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--surface); text-align: center;
+}
+.state-title { font-size: .875rem; font-weight: 650; color: var(--ink); }
+.state-body { margin-top: .35rem; font-size: .78rem; line-height: 1.6; color: var(--muted); }
+.state .btn { margin-top: .75rem; }
+.state-empty { border-style: dashed; border-color: var(--rule-strong); }
+.state-loading { color: var(--faint); border-style: dashed; }
+.state-loading .state-title { color: var(--muted); }
+.state-error { border-color: var(--breach-rule); background: var(--breach-bg); }
+.state-error .state-title { color: var(--breach); }
+.state-stale { border-style: dashed; border-color: var(--stale-rule); background: var(--stale-bg); }
+.state-permission { border-style: dotted; border-color: var(--unknown-rule); background: var(--unknown-bg); }
+.state-success { border-color: var(--within-rule); background: var(--within-bg); }
+.state-success .state-title { color: var(--within); }
+
+.freshness { display: inline-flex; align-items: baseline; gap: .4rem; font-size: .75rem; color: var(--muted); }
+
+.clock {
+  padding: .75rem var(--density-panel-pad);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow);
+}
+.clock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .5rem .75rem; margin-top: .5rem; }
+.clock-grid dt { margin-bottom: .1rem; }
+.clock-grid dd { font-size: .75rem; color: var(--ink-2); }
+.clock-bad { border-left: 4px solid var(--breach); }
+.clock-warn { border-left: 4px solid var(--review-hi); }
+.clock-good { border-left: 4px solid var(--within-hi); }
+
+.queue-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: .5rem 1rem; margin-bottom: .75rem;
+}
+.queue-toolbar-controls { display: flex; flex-wrap: wrap; gap: .5rem; }
+.queue-toolbar-summary { font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.evidence {
+  padding: .75rem var(--density-panel-pad);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rule-strong);
+  border-radius: var(--radius-sm); background: var(--surface);
+}
+.evidence + .evidence { margin-top: .5rem; }
+.evidence-title { margin-top: .3rem; font-size: .8125rem; font-weight: 600; color: var(--ink); }
+.evidence-title a:hover { color: var(--reference); }
+.evidence-provenance { margin-top: .2rem; font-size: .75rem; line-height: 1.55; color: var(--muted); }
+.evidence-retrieved { margin-top: .3rem; font-size: .6875rem; color: var(--faint); }
+.evidence-derived { border-left-color: var(--reference); }
+.evidence-inferred { border-left-color: var(--review-hi); }
+.evidence-pending { border-left-style: dotted; border-left-color: var(--unknown-rule); }
+
+.audit-event {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem;
+  padding: .55rem var(--density-panel-pad);
+  border-bottom: 1px solid var(--rule); font-size: .78rem;
+}
+.audit-event-seq { color: var(--faint); }
+.audit-event-main { min-width: 0; flex: 1; color: var(--ink-2); }
+.audit-event-reason { color: var(--muted); }
+.audit-event-when { margin-left: auto; color: var(--muted); white-space: nowrap; }
+
+.breadcrumb ol { display: flex; flex-wrap: wrap; gap: .35rem; font-size: .75rem; color: var(--muted); }
+.breadcrumb li + li::before { content: "/"; margin-right: .35rem; color: var(--faint); }
+.breadcrumb a:hover { color: var(--ink); text-decoration: underline; }
+.breadcrumb [aria-current="page"] { color: var(--ink-2); font-weight: 600; }
+
+/* --- Phase 3: authenticated shell (§9.2), command palette (§7.4), Operations
+   Home (§9.3). Tokens only; no new hues, no state by colour alone. */
+
+/* Environment badge: always visible, never the only synthetic-data marker —
+   the banner notice and footer carry the long form. */
+.env-badge {
+  display: inline-block;
+  border: 1px solid rgba(251,191,36,.45); border-radius: 999px;
+  padding: .1rem .55rem;
+  font-size: .625rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--review-hi); background: rgba(251,191,36,.1);
+}
+
+/* Workspace lens switcher. A real switcher for multi-lens accounts (native
+   <details>, keyboard-reachable); a static label otherwise. */
+.lens-switch { margin: 0 .35rem; }
+.lens-switch > summary {
+  cursor: pointer; list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  border: 1px solid rgba(255,255,255,.14); border-radius: var(--radius-sm);
+  padding: .45rem .7rem;
+  font-size: .8125rem; font-weight: 500; color: #fff;
+  background: rgba(255,255,255,.05);
+}
+.lens-switch > summary::-webkit-details-marker { display: none; }
+.lens-switch > summary:hover { background: rgba(255,255,255,.09); }
+.lens-switch-caret {
+  width: 0; height: 0; flex-shrink: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid #cbd5e1;
+  transition: transform .14s ease;
+}
+.lens-switch[open] .lens-switch-caret { transform: rotate(180deg); }
+.lens-switch-menu { padding-top: .35rem; }
+.lens-static {
+  margin: 0 .35rem; padding: .45rem .7rem;
+  border: 1px dashed rgba(255,255,255,.18); border-radius: var(--radius-sm);
+  font-size: .75rem; color: #cbd5e1;
+}
+
+/* Topbar: workspace name, palette trigger, freshness, help. */
+.topbar {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .55rem 1.5rem;
+  background: var(--surface); border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; z-index: 30;
+}
+.topbar-workspace {
+  font-size: .8125rem; font-weight: 650; color: var(--ink);
+  letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-search {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: .6rem;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  padding: .35rem .6rem;
+  font-size: .75rem; color: var(--faint);
+  min-width: 13rem;
+  transition: border-color .14s ease, background-color .14s ease;
+}
+.topbar-search:hover { border-color: var(--muted); background: var(--surface); color: var(--muted); }
+.topbar-search-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.topbar-kbd {
+  margin-left: auto;
+  font-family: inherit; font-size: .625rem; font-weight: 600;
+  border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px;
+  padding: 0 .3rem; color: var(--muted); background: var(--surface);
+}
+.topbar-freshness { white-space: nowrap; }
+.topbar-help {
+  font-size: .75rem; font-weight: 500; color: var(--muted);
+  white-space: nowrap;
+}
+.topbar-help:hover { color: var(--ink); text-decoration: underline; }
+
+/* Mobile navigation drawer. Hidden on desktop; below the shell breakpoint the
+   rail disappears (see the 900px block) and this is the navigation. */
+.nav-drawer { display: none; position: relative; }
+.nav-drawer > summary {
+  cursor: pointer; list-style: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.nav-drawer > summary::-webkit-details-marker { display: none; }
+.nav-drawer-icon, .nav-drawer-icon::before, .nav-drawer-icon::after {
+  display: block; width: 1rem; height: 2px; background: var(--ink-2);
+  position: relative; content: "";
+}
+.nav-drawer-icon::before { position: absolute; top: -5px; }
+.nav-drawer-icon::after { position: absolute; top: 5px; }
+.nav-drawer-panel {
+  position: absolute; left: 0; top: calc(100% + .4rem); z-index: 40;
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: 70vh; overflow-y: auto;
+  background: var(--institution); border-radius: var(--radius);
+  padding: .75rem .75rem 1rem;
+  box-shadow: var(--shadow-lift);
+}
+@media (max-width: 900px) {
+  .nav-drawer { display: block; }
+  .topbar { padding: .5rem 1rem; gap: .5rem; }
+  .topbar-search { min-width: 0; flex: 1 1 auto; }
+  .topbar-search-label { display: none; }
+  .topbar-freshness { display: none; }
+  .topbar-help { display: none; }
+}
+
+/* Command palette (§7.4). */
+.palette { position: fixed; inset: 0; z-index: 60; }
+.palette-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(15,23,42,.45);
+}
+.palette-panel {
+  position: relative; margin: 12vh auto 0;
+  width: min(36rem, calc(100vw - 2rem));
+  background: var(--surface); border: 1px solid var(--rule-strong);
+  border-radius: var(--radius); box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+.palette-input-row { display: flex; align-items: center; gap: .5rem; padding: .75rem .9rem; border-bottom: 1px solid var(--rule); }
+.palette-input-row input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  font-size: .9375rem; color: var(--ink);
+}
+.palette-status {
+  padding: .5rem .9rem; margin: 0;
+  font-size: .75rem; color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+}
+.palette-results { max-height: 46vh; overflow-y: auto; padding: .35rem; }
+.palette-group {
+  margin: .35rem .35rem .15rem; font-size: .625rem; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--faint);
+}
+.palette-item {
+  display: block; border-radius: var(--radius-sm);
+  padding: .45rem .55rem; color: var(--ink-2);
+}
+.palette-item:hover, .palette-item-active { background: var(--surface-sunk); color: var(--ink); }
+.palette-item-active { outline: 2px solid var(--focus); outline-offset: -2px; }
+.palette-item-title { display: block; font-size: .8125rem; font-weight: 600; }
+.palette-item-sub { display: block; font-size: .6875rem; color: var(--muted); margin-top: .1rem; }
+.palette-footer {
+  margin: 0; padding: .5rem .9rem;
+  font-size: .6875rem; color: var(--faint);
+  border-top: 1px solid var(--rule);
+}
+
+/* --- Operations Home (§9.3) --------------------------------------------------
+   The queue outranks the metric: an ordered priority list, not a KPI wall. */
+.oh-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; }
+.oh-greeting { font-size: 1.25rem; font-weight: 650; letter-spacing: -.015em; color: var(--ink); }
+.oh-question { font-size: .875rem; color: var(--muted); }
+.oh-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .85rem; }
+.oh-chip {
+  display: inline-flex; align-items: baseline; gap: .45rem;
+  border: 1px solid var(--rule); border-radius: 999px;
+  background: var(--surface); padding: .3rem .8rem;
+  font-size: .75rem; color: var(--ink-2);
+}
+.oh-chip b { font-size: .875rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.oh-chip-bad { border-color: var(--breach-rule); background: var(--breach-bg); }
+.oh-chip-bad b { color: var(--breach); }
+.oh-chip-warn { border-color: var(--review-rule); background: var(--review-bg); }
+.oh-chip-warn b { color: var(--review); }
+
+.oh-grid { display: grid; gap: 1rem; margin-top: 1rem; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .oh-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.oh-queue { list-style: none; margin: 0; padding: 0; display: block; }
+.oh-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .35rem .8rem; align-items: start;
+  padding: .7rem .9rem;
+  border-top: 1px solid var(--rule);
+  transition: background-color .14s ease;
+}
+.oh-row:first-child { border-top: 0; }
+.oh-row:hover { background: var(--surface-sunk); }
+.oh-row-kind { padding-top: .15rem; }
+.oh-row-main { min-width: 0; }
+.oh-row-title { font-size: .8125rem; font-weight: 600; color: var(--ink); line-height: 1.45; }
+.oh-row-context { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+.oh-row-basis { font-size: .6875rem; color: var(--faint); margin-top: .2rem; }
+.oh-row-state { text-align: right; max-width: 15rem; }
+.oh-row-status { display: block; font-size: .75rem; font-weight: 500; color: var(--ink-2); line-height: 1.45; }
+.oh-row-action {
+  display: inline-block; margin-top: .25rem;
+  font-size: .75rem; font-weight: 600; color: var(--reference);
+}
+.oh-row-action:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .oh-row { grid-template-columns: minmax(0, 1fr); }
+  .oh-row-state { text-align: left; max-width: none; }
+}
+
+/* Container-query responsiveness for the queue: the same row compresses when
+   its panel narrows, wherever the panel sits (§6.2). */
+.oh-queue-panel { container-type: inline-size; }
+@container (max-width: 34rem) {
+  .oh-row { grid-template-columns: minmax(0, 1fr); }
+  .oh-row-state { text-align: left; max-width: none; }
+}
+
+.oh-scope { list-style: none; margin: 0; padding: 0; }
+.oh-scope li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .75rem;
+  padding: .55rem .9rem; border-top: 1px solid var(--rule);
+  font-size: .8125rem;
+}
+.oh-scope li:first-child { border-top: 0; }
+.oh-scope a { color: var(--ink-2); }
+.oh-scope a:hover { color: var(--reference); text-decoration: underline; }
+.oh-scope b { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+
+.oh-recent { list-style: none; margin: 0; padding: .35rem .9rem; }
+
+/* The chain-state line under recent activity: a standing, dated proof claim
+   with bounded wording (§11.5), never a badge of organizational compliance. */
+.oh-chain {
+  display: flex; align-items: center; gap: .5rem;
+  margin: 0 .9rem .8rem; padding-top: .6rem;
+  border-top: 1px solid var(--rule);
+  font-size: .75rem; color: var(--muted);
+}

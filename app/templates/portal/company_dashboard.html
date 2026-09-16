@@ -1,0 +1,198 @@
+{#-
+  portal/company_dashboard.html — the Company (sponsor) dashboard (spec section 41).
+
+  The section's operational KPI set — not the institution's oversight KPIs:
+    pending registrations · upcoming appointments · open corrective actions ·
+    overdue responses · trials managed · escalations awaiting response
+
+  The Company's job in the governance loop is the RESPONSE half (spec section 15):
+  an escalation lands here as "awaiting your response" with its statutory clock,
+  and the structured nine-field response is filed from the escalation's own page
+  (the existing /escalations/{id} response form, role-gated to `company`).
+
+  Context contract (all scoped by the route to the trials this company sponsors;
+  portal_* shell variables inherited from portal/_base.html):
+
+    company_kpis            list     Metric-shaped dicts (label, value, sub, tone,
+                                      href, definition) — the six operational figures
+    trials                  list     `trials` rows this company runs, each carrying the
+                                      route-computed columns:
+                                        pending_registrations   int
+                                        upcoming_appointments   int  (next 14 days)
+                                        open_issues             int  (non-closed escalations)
+    awaiting_response       list     escalations with status 'open' where the company must
+                                      respond; each row carries the route-computed
+                                        deadline      str|None   (statutory clock deadline)
+                                        hours_left    float|None (live, from the clock)
+    open_issues             list     every non-closed escalation touching this company's
+                                      trials (any status), for the issues queue table
+    open_corrective_actions list     corrective_actions rows the company submitted and
+                                      that are still tracked open, or escalated items it
+                                      owes an action on: (escalation_id, trial_id,
+                                      expected_resolution, responsible_person, submitted_at)
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head, badge %}
+{% from "portal/_partials.html" import p_metric, p_status_badge, p_empty, p_toolkit_start, p_toolkit_end, p_panel_head %}
+
+{% set portal_id = 'company' %}
+{% set portal_label = 'Company portal' %}
+{% set portal_crumbs = [('Dashboard', None)] %}
+{% set portal_nav_sections = [
+  ('Operate', [
+    ('/portal/company', 'Dashboard', None),
+    ('/portal/company/operations', 'Trial operations', None),
+    ('/escalations', 'Issues & responses', awaiting_response | length or None),
+  ]),
+  ('On this page', [
+    ('#tbl-awaiting', 'Awaiting your response', awaiting_response | length or None),
+    ('#tbl-trials', 'My trials', None),
+    ('#tbl-issues', 'Issue queue', open_issues | length or None),
+  ]),
+] %}
+
+{% block portal_main %}
+{% call page_head('Company dashboard',
+                  'Your trials, your queues and the statutory clock — the operational view, not the oversight view.') %}
+  <a href="/portal/company/operations" class="btn btn-secondary">Open trial operations →</a>
+{% endcall %}
+
+{% set kpis = company_kpis | default([]) %}
+{% if kpis %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  {% for m in kpis %}
+    {{ p_metric(m.label, m.value, m.sub | default(None), m.tone | default('neutral'), m.href | default(None), m.definition | default(None)) }}
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ---- the queue that defines this role: escalations waiting on the company ---- #}
+<section class="panel mt-6 overflow-hidden">
+  <div class="panel-head"><span class="panel-title">Awaiting your response</span><span class="text-xs text-slate-400">escalations whose statutory clock is running</span></div>
+  <div class="tbl-scroll"><table class="tbl" id="tbl-awaiting">
+    <thead>
+      <tr>
+        <th data-sort>Escalation</th><th data-sort>Trial</th><th data-sort>Type</th>
+        <th data-sort>Severity</th><th data-sort>Statutory deadline</th><th>Open</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in awaiting_response %}
+      <tr class="{{ 'row-breach' if e.hours_left is not none and e.hours_left < 0 else '' }}">
+        <td>
+          <a href="/escalations/{{ e.id }}" class="code font-medium text-[color:var(--reference)]">{{ e.id[:8] }}</a>
+          <div class="max-w-xs truncate text-xs text-slate-500">{{ e.reason[:90] }}{{ '…' if e.reason | length > 90 else '' }}</div>
+        </td>
+        <td><a href="/trial/{{ e.trial_id }}" class="code text-slate-600 hover:text-[color:var(--reference)]">{{ e.trial_id }}</a></td>
+        <td>{{ badge(e.escalation_type | label, 'neutral') }}</td>
+        <td>{{ badge(e.severity | label, {'critical': 'bad', 'high': 'bad', 'medium': 'warn'}.get(e.severity, 'neutral')) }}</td>
+        <td>
+          {% if e.deadline %}
+            <span class="tabular-nums text-slate-700">{{ e.deadline | dt }}</span>
+            {% if e.hours_left is not none %}
+              {% set hrs = e.hours_left %}
+            <div class="mt-0.5 text-[11px] tabular-nums {{ 'text-[color:var(--breach)]' if hrs < 0 else 'text-slate-400' }}">
+              {{ ('overdue by ' ~ ((-hrs) | round(1)) ~ 'h') if hrs < 0 else ((hrs | round(1)) ~ 'h left') }}
+            </div>
+            {% endif %}
+          {% else %}
+            <span class="text-xs text-slate-400">no clock — protocol deviation</span>
+          {% endif %}
+        </td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'Nothing is waiting on the company right now.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {{ p_toolkit_end('tbl-awaiting') }}
+</section>
+
+<div class="mt-5 grid items-start gap-5 xl:grid-cols-[1.6fr_1fr]">
+  {# ---- trials this company manages -------------------------------------------- #}
+  <section class="panel overflow-hidden">
+    {{ p_panel_head('My trials', trials | default([]) | length ~ ' under management') }}
+    <div class="tbl-scroll"><table class="tbl" id="tbl-trials">
+      <thead>
+        <tr>
+          <th data-sort>Trial</th><th data-sort>Stage</th><th data-sort>Operational</th>
+          <th data-sort class="num">Registrations</th><th data-sort class="num">Appointments</th><th data-sort class="num">Issues</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trials | default([]) %}
+        <tr>
+          <td>
+            <a href="/trial/{{ t.id }}" class="code font-medium text-slate-700 hover:text-[color:var(--reference)]">{{ t.id }}</a>
+            <div class="max-w-xs truncate text-xs text-slate-500">{{ t.title }}</div>
+          </td>
+          <td>{{ p_status_badge(t.status) }}</td>
+          <td>{{ p_status_badge(t.operational_status) }}</td>
+          <td class="num tabular-nums text-slate-700">{{ t.pending_registrations | default(0) }}</td>
+          <td class="num tabular-nums text-slate-700">{{ t.upcoming_appointments | default(0) }}</td>
+          <td class="num tabular-nums {{ 'font-medium text-[color:var(--breach)]' if t.open_issues | default(0) else 'text-slate-400' }}">
+            {{ t.open_issues | default(0) }}
+          </td>
+        </tr>
+        {% else %}
+        {{ p_empty(6, 'No trials are configured for this company yet.') }}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+  {# ---- open corrective actions the company owes / has submitted ---------------- #}
+  <section class="panel overflow-hidden">
+    {{ p_panel_head('Corrective actions', 'open items') }}
+    <ul class="divide-y" style="border-color:var(--rule)">
+      {% for c in open_corrective_actions | default([]) %}
+      <li class="alert">
+        <a href="/escalations/{{ c.escalation_id }}" class="alert-trial code">{{ c.escalation_id[:8] }}</a>
+        <a href="/trial/{{ c.trial_id }}" class="code text-slate-500 hover:text-[color:var(--reference)]">{{ c.trial_id }}</a>
+        <span class="text-slate-600">{{ c.expected_resolution }}</span>
+        <span class="ml-auto text-[11px] tabular-nums text-slate-400">{{ c.submitted_at | d }} · {{ c.responsible_person }}</span>
+      </li>
+      {% else %}
+      <li class="px-4 py-6 text-center text-sm text-slate-400">No corrective actions in flight.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+{# ---- every non-closed escalation touching this company's trials ---------------- #}
+<section class="panel mt-5 overflow-hidden">
+  <div class="panel-head"><span class="panel-title">Issue queue</span><span class="text-xs text-slate-400">every open escalation on your trials</span></div>
+  <div class="tbl-scroll"><table class="tbl" id="tbl-issues">
+    <thead>
+      <tr>
+        <th data-sort>Escalation</th><th data-sort>Trial</th><th data-sort>Raised by</th>
+        <th data-sort>Status</th><th data-sort>Created</th><th>Decision to date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in open_issues | default([]) %}
+      <tr>
+        <td><a href="/escalations/{{ e.id }}" class="code font-medium text-[color:var(--reference)]">{{ e.id[:8] }}</a></td>
+        <td class="code text-slate-600">{{ e.trial_id }}</td>
+        <td class="text-xs text-slate-600">{{ e.raised_by }} · {{ e.raised_by_role | label }}</td>
+        <td>{{ p_status_badge(e.status) }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+        <td class="text-xs text-slate-500">
+          {% if e.leadership_decision %}{{ e.leadership_decision | label }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'No open issues.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {{ p_toolkit_end('tbl-issues') }}
+</section>
+
+<p class="mt-3 text-[11.5px] leading-relaxed text-slate-500">
+  Responding to an escalation is a Company action only — the oversight roles that raised
+  the concern cannot submit on the company's behalf (spec section 15). Every response
+  filed is written with its timestamp to the append-only audit trail.
+</p>
+{% endblock %}

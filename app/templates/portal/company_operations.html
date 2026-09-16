@@ -1,0 +1,264 @@
+{#-
+  portal/company_operations.html — Company trial operations (prompt.md §5.1,
+  §9.3): eligibility criteria, registration/consent form publishing and
+  appointment scheduling for one trial, plus this trial's issue queue.
+
+  The persistent trial-context header (§5.1's named Company gap) makes this
+  screen and the Company dashboard read as one workspace: the trial's four
+  independent status dimensions are shown distinctly here — lifecycle,
+  operational, safety, leadership — never collapsed into one "health" badge.
+
+  Honest capability boundary: trial creation/editing is NOT a Company
+  capability in this build — no such route exists (the registry is seeded),
+  so this screen no longer carries a create/edit form that would have POSTed
+  nowhere. Equally, eligibility decisions belong to the Investigator portal
+  (app/ctms.py::decide_eligibility); submissions render here read-only.
+
+  Context contract (supplied by app/main.py::company_operations):
+
+    trials              list   all trials rows (id, title) for the selector
+    trial               row|None  the selected trial, full row
+    selected_trial      str    the selected trial id
+    criteria            list   eligibility_criteria rows for the trial
+    registration_form   dict|None  latest published registration_forms row,
+                                   with `fields` parsed from fields_json
+    submissions_queue   list   registration_submissions rows (read-only here)
+    consent_forms       list   consent_forms rows, newest version first
+    appointments_queue  list   appointments joined to participant_code:
+                               (participant_code, visit_name, scheduled_date,
+                               status, details)
+    issue_queue         list   escalations on this trial, not closed/resolved
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head, badge %}
+{% from "portal/_partials.html" import p_status_badge, p_field, p_empty, p_toolkit_end, p_panel_head %}
+
+{% set portal_id = 'company' %}
+{% set portal_label = 'Company portal' %}
+{% set portal_crumbs = [('Dashboard', '/portal/company'), ('Trial operations', None)] %}
+{% set portal_nav_sections = [
+  ('Operate', [
+    ('/portal/company', 'Dashboard', None),
+    ('/portal/company/operations', 'Trial operations', None),
+    ('/escalations', 'Issues & responses', issue_queue | selectattr('status', 'equalto', 'open') | list | length or None),
+  ]),
+  ('On this page', [
+    ('#eligibility-criteria', 'Eligibility criteria', None),
+    ('#registration', 'Registration form & submissions', None),
+    ('#consent', 'Consent forms', None),
+    ('#appointments', 'Appointments', None),
+    ('#issues', 'Issue queue', issue_queue | length or None),
+  ]),
+] %}
+
+{% block portal_main %}
+{% call page_head('Trial operations',
+                  'One trial in focus: its rules, its forms, its schedule and the issues it owes an answer to. Every write below is an audited mutation.') %}{% endcall %}
+
+{# ---- persistent trial-context header (§5.1) -------------------------------------- #}
+<div class="panel px-4 py-3">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+    <form method="get" action="/portal/company/operations" class="flex flex-wrap items-center gap-3">
+      <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-500" for="trial-sel">Trial in focus</label>
+      <select id="trial-sel" name="trial" onchange="this.form.submit()" class="field" style="max-width:340px">
+        {% for t in trials %}
+        <option value="{{ t.id }}" {{ 'selected' if selected_trial and t.id == selected_trial else '' }}>
+          {{ t.id }} — {{ t.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if trial %}<a class="text-[13px] text-[color:var(--reference)] hover:underline" href="/trial/{{ trial.id }}">Open trial workspace →</a>{% endif %}
+  </div>
+  {% if trial %}
+  <dl class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-100 pt-3 text-[12px]">
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">Lifecycle</dt><dd>{{ p_status_badge(trial.status) }}</dd></div>
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">Operational</dt><dd>{{ p_status_badge(trial.operational_status) }}</dd></div>
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">Safety</dt><dd>{{ p_status_badge(trial.safety_status) }}</dd></div>
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">Leadership</dt><dd>{{ p_status_badge(trial.leadership_status) }}</dd></div>
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">PI</dt><dd class="text-slate-600">{{ trial.pi_name }}</dd></div>
+    <div class="flex items-center gap-1.5"><dt class="text-slate-400">CTRI</dt><dd class="code text-slate-600">{{ trial.ctri_number or '—' }}</dd></div>
+  </dl>
+  <p class="mt-2 text-[11.5px] leading-relaxed text-slate-400">
+    Four independent status dimensions, shown distinctly — a paused trial is not a terminated one,
+    and a safety flag is not a lifecycle stage. Trial creation and editing are not part of this
+    build: the registry is seeded, and a configuration write route is a documented
+    backend-dependent gap, not a hidden form.
+  </p>
+  {% endif %}
+</div>
+
+{# ---- eligibility criteria ---------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="eligibility-criteria">
+  {{ p_panel_head('Eligibility criteria', 'the pre-screen engine compares submissions against these — the Investigator still decides') }}
+  <div class="tbl-scroll"><table class="tbl" id="tbl-criteria">
+    <thead>
+      <tr><th>#</th><th data-sort>Criterion</th><th data-sort>Type</th><th data-sort>Required</th><th data-sort>Added</th></tr>
+    </thead>
+    <tbody>
+      {% for c in criteria | default([]) %}
+      <tr>
+        <td class="num text-slate-400">{{ loop.index }}</td>
+        <td class="text-slate-700">{{ c.criterion_text }}</td>
+        <td class="text-xs text-slate-500">{{ c.criterion_type | label }}</td>
+        <td>{{ badge('Required', 'warn') if c.required else badge('Advisory', 'neutral') }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ c.created_at | d }}</td>
+      </tr>
+      {% else %}
+      {{ p_empty(5, 'No criteria defined for this trial yet.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <form method="post" action="/portal/company/criteria" class="grid gap-3 border-t p-4 sm:grid-cols-2" style="border-color:var(--rule)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="trial_id" value="{{ selected_trial }}">
+    {{ p_field('Criterion text', 'text', required=True, placeholder='e.g. Age 18 years or older') }}
+    {{ p_field('Type', 'criterion_type', kind='select', required=True,
+               options=[('inclusion','Inclusion'),('exclusion','Exclusion')]) }}
+    <div class="sm:col-span-2">
+      <button type="submit" class="btn btn-secondary px-5 py-2">Add criterion</button>
+    </div>
+  </form>
+</section>
+
+{# ---- registration form + submissions queue (read-only here) ------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="registration">
+  {{ p_panel_head('Registration form & submissions',
+                  ('v' ~ registration_form.version_no ~ ' · ' ~ (registration_form.status | label)) if registration_form else 'no published form') }}
+  {% if registration_form %}
+  <div class="px-4 py-3">
+    <div class="flex flex-wrap gap-1.5">
+      {% for f in registration_form.fields %}
+      <span class="chip">{{ f.label or f.name }}{% if f.required %} *{% endif %}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div class="panel-head"><span class="panel-title">Submissions</span><span class="text-xs text-slate-400">read-only here — eligibility decisions belong to the Investigator portal</span></div>
+  <div class="tbl-scroll"><table class="tbl" id="tbl-submissions">
+    <thead>
+      <tr><th data-sort>Submission</th><th data-sort>Submitted</th><th data-sort>Status</th><th>Decided by</th></tr>
+    </thead>
+    <tbody>
+      {% for s in submissions_queue | default([]) %}
+      <tr>
+        <td class="code text-slate-700">{{ s.id[:8] }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ s.submitted_at | dt }}</td>
+        <td>{{ p_status_badge(s.status) }}</td>
+        <td class="text-xs text-slate-500">
+          {% if s.reviewed_by %}{{ s.reviewed_by }} · {{ s.reviewed_at | dt }}{% else %}— awaiting investigator{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      {{ p_empty(4, 'No registration submissions yet.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {{ p_toolkit_end('tbl-submissions') }}
+  <form method="post" action="/portal/company/forms/registration" class="grid gap-3 border-t p-4 sm:grid-cols-3" style="border-color:var(--rule)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="trial_id" value="{{ selected_trial }}">
+    {{ p_field('Fields JSON', 'fields_json', required=True, placeholder='[{"name":"age","label":"Age","required":true}]', hint='Publishing freezes this version; in-flight submissions keep their filed version.') }}
+    <div class="sm:col-span-2 flex items-end">
+      <button type="submit" class="btn btn-secondary px-5 py-2">Publish form version</button>
+    </div>
+  </form>
+</section>
+
+{# ---- consent forms --------------------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="consent">
+  {{ p_panel_head('Consent forms', 'versioned — a participant always consents to a named version') }}
+  <div class="tbl-scroll"><table class="tbl" id="tbl-consent">
+    <thead>
+      <tr><th data-sort>Version</th><th data-sort>Status</th><th data-sort>Published</th></tr>
+    </thead>
+    <tbody>
+      {% for c in consent_forms | default([]) %}
+      <tr>
+        <td class="code text-slate-700">v{{ c.version_no }}</td>
+        <td>{{ p_status_badge(c.status) }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ (c.published_at or c.created_at) | dt }}</td>
+      </tr>
+      {% else %}
+      {{ p_empty(3, 'No consent form published for this trial.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <form method="post" action="/portal/company/forms/consent" class="grid gap-3 border-t p-4 sm:grid-cols-2" style="border-color:var(--rule)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="trial_id" value="{{ selected_trial }}">
+    {{ p_field('Consent content for the new version', 'content', kind='textarea', required=True, rows=3, placeholder='The exact consent text participants will accept or reject.') }}
+    <div class="flex items-end">
+      <button type="submit" class="btn btn-secondary px-5 py-2">Publish new consent version</button>
+    </div>
+  </form>
+</section>
+
+{# ---- appointments ------------------------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="appointments">
+  <div class="panel-head"><span class="panel-title">Appointment queue</span><span class="text-xs text-slate-400">soonest first</span></div>
+  <div class="tbl-scroll"><table class="tbl" id="tbl-appointments">
+    <thead>
+      <tr><th data-sort>Participant</th><th data-sort>Visit</th><th data-sort>Scheduled</th><th data-sort>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for a in appointments_queue | default([]) %}
+      <tr>
+        <td class="code text-slate-600">{{ a.participant_code }}</td>
+        <td class="text-slate-700">{{ a.visit_name }}</td>
+        <td class="text-xs tabular-nums text-slate-500">{{ a.scheduled_date | dt }}</td>
+        <td>{{ p_status_badge(a.status) }}</td>
+      </tr>
+      {% else %}
+      {{ p_empty(4, 'No appointments on the schedule.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {{ p_toolkit_end('tbl-appointments') }}
+  <form method="post" action="/portal/company/appointments" class="grid gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-4" style="border-color:var(--rule)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="trial_id" value="{{ selected_trial }}">
+    {{ p_field('Participant code', 'participant_code', required=True, placeholder='e.g. AYU-008-014') }}
+    {{ p_field('Visit title', 'title', required=True, placeholder='e.g. Week 4 follow-up') }}
+    {{ p_field('Scheduled for', 'scheduled_at', kind='date', required=True) }}
+    {{ p_field('Details', 'details', required=False, placeholder='optional note') }}
+    <div class="flex items-end">
+      <button type="submit" class="btn btn-secondary px-5 py-2">Schedule appointment</button>
+    </div>
+  </form>
+</section>
+
+{# ---- issue queue with the statutory clock --------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="issues">
+  {{ p_panel_head('Issue queue', 'escalations on this trial that are not closed') }}
+  <div class="tbl-scroll"><table class="tbl" id="tbl-issues">
+    <thead>
+      <tr><th data-sort>Escalation</th><th data-sort>Type</th><th data-sort>Severity</th><th data-sort>Status</th><th data-sort>Created</th><th>Your move</th></tr>
+    </thead>
+    <tbody>
+      {% for e in issue_queue | default([]) %}
+      <tr class="{{ 'row-breach' if e.status == 'open' and e.deadline else '' }}">
+        <td>
+          <span class="code text-slate-700">{{ e.id[:8] }}</span>
+          <div class="max-w-xs truncate text-xs text-slate-500">{{ e.reason[:80] }}{{ '…' if e.reason | length > 80 else '' }}</div>
+        </td>
+        <td>{{ badge(e.escalation_type | label, 'neutral') }}</td>
+        <td>{{ badge(e.severity | label, {'critical': 'bad', 'high': 'bad', 'medium': 'warn'}.get(e.severity, 'neutral')) }}</td>
+        <td>{{ p_status_badge(e.status) }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+        <td>
+          {% if e.status == 'open' %}
+            <a class="btn btn-primary" style="padding:.3rem .8rem" href="/escalations/{{ e.id }}">Respond</a>
+          {% else %}
+            <a class="text-xs text-[color:var(--reference)] hover:underline" href="/escalations/{{ e.id }}">Open →</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'No open issues on this trial.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{% endblock %}

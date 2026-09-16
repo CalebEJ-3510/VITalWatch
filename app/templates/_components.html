@@ -1,0 +1,202 @@
+{# VITalWatch — shared component layer (Phase 1, prompt.md §6.4).
+
+   Every reusable primitive lives here so a state, a badge or a clock means the
+   same thing on every screen. Templates must import from this file (and
+   _macros.html for the older primitives) instead of inlining markup: the
+   current codebase's five near-identical "title, tiles, panels, table" pages
+   exist precisely because state markup was copy-pasted per template.
+
+   Rules for anything added here:
+   - No emoji as semantic markers. Ever.
+   - No state communicated by colour alone: every tinted thing carries text.
+   - Every macro that can fail, empty, load or expire has those states defined
+     here, not invented at the call site (prompt.md §10.1).
+   - Durations and colours come from tokens.css variables only.               #}
+
+{% from "_macros.html" import badge %}
+
+{# ---------------------------------------------------------------------------
+   The consolidated synthetic-data notice (§13.1). One macro, two placements,
+   one copy source — the current product states its boundaries in a banner, a
+   footer and a home-page paragraph that have already drifted from each other.
+   The banner is compact and persistent; the long form lives behind a details
+   disclosure so the warning never out-shouts an actual safety warning.      #}
+{% macro notice_synthetic(mode="banner") %}
+  {# The §13.1 trust lines, verbatim where the spec mandates them. The banner is
+     the compact persistent indicator: one line, always visible, with the longer
+     boundary statement behind a disclosure so it cannot out-shout an actual
+     safety warning. The footer carries the same first line so the two
+     placements cannot drift into contradiction (§0.1, point 2). #}
+  {% if mode == "banner" %}
+  <div class="notice-synthetic" role="note">
+    <span class="notice-synthetic-dot" aria-hidden="true"></span>
+    <span class="notice-synthetic-line">
+      <strong>Synthetic demonstration data — not for patient care or clinical decision-making.</strong>
+      <details class="notice-synthetic-more">
+        <summary>What this demonstration is, and is not</summary>
+        <div class="notice-synthetic-body">
+          <p>VITalWatch supports review and coordination; it does not replace qualified
+            medical, regulatory, or ethics judgement.</p>
+          <p>Every record is generated; no participant is identifiable. AE terms are coded
+            against a curated vocabulary (app/terms.csv), not MedDRA or WHODrug. Every page
+            and API route requires a signed-in session; write routes additionally require
+            a role permitted to perform that action (see /docs).</p>
+        </div>
+      </details>
+    </span>
+  </div>
+  {% else %}
+  <span>Synthetic demonstration data — not for patient care or clinical decision-making.</span>
+  <span>AE terms coded against a curated vocabulary, not MedDRA or WHODrug.</span>
+  {% endif %}
+{% endmacro %}
+
+{# ---------------------------------------------------------------------------
+   State blocks. §10.1 distinguishes eight states; the four "empty" reasons are
+   separate macros' callers, not one generic hole, because "no records" and
+   "no permission" need different next actions and different honesty.        #}
+
+{% macro state_empty(reason, title, body=None, action_href=None, action_label=None) %}
+  {# reason: no_records | no_matches | no_permission | not_loaded #}
+  <div class="state state-empty" data-empty-reason="{{ reason }}">
+    <p class="state-title">{{ title }}</p>
+    {% if body %}<p class="state-body">{{ body }}</p>{% endif %}
+    {% if action_href %}<a class="btn btn-secondary" href="{{ action_href }}">{{ action_label or "Continue" }}</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro state_loading(label="Loading") %}
+  <div class="state state-loading" role="status" aria-live="polite">
+    <p class="state-title">{{ label }}…</p>
+    <p class="state-body">The rest of this page stays where it is while this region updates.</p>
+  </div>
+{% endmacro %}
+
+{% macro state_error(what_failed, action_completed=None, recovery_href=None, recovery_label="Try again") %}
+  <div class="state state-error" role="alert">
+    <p class="state-title">{{ what_failed }}</p>
+    <p class="state-body">
+      {% if action_completed is none %}Whether the action completed is unknown — check the record before retrying.
+      {% elif action_completed %}The action did complete; only this view failed to refresh.
+      {% else %}The action did not complete. Nothing was changed.{% endif %}
+    </p>
+    {% if recovery_href %}<a class="btn btn-secondary" href="{{ recovery_href }}">{{ recovery_label }}</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro state_stale(as_of, refresh_href=None) %}
+  <div class="state state-stale" role="status">
+    <p class="state-title">Data may be stale</p>
+    <p class="state-body">Last known values shown, as of <span class="code">{{ as_of }}</span>.
+      These are not current until refreshed.</p>
+    {% if refresh_href %}<a class="btn btn-secondary" href="{{ refresh_href }}">Refresh</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro state_permission(kind, body) %}
+  {# kind: forbidden | read_only | out_of_scope | missing_data #}
+  <div class="state state-permission" data-permission-kind="{{ kind }}">
+    <p class="state-title">
+      {{ {"forbidden": "Not authorized", "read_only": "Read-only access",
+          "out_of_scope": "Outside your scope",
+          "missing_data": "Workflow data not available"}[kind] }}
+    </p>
+    <p class="state-body">{{ body }}</p>
+  </div>
+{% endmacro %}
+
+{% macro state_success(action, record_id=None, audit_href=None) %}
+  <div class="state state-success" role="status">
+    <p class="state-title">{{ action }}</p>
+    {% if record_id %}<p class="state-body">Recorded as <span class="code">{{ record_id }}</span>.</p>{% endif %}
+    {% if audit_href %}<p class="state-body"><a href="{{ audit_href }}">View the audit entry</a></p>{% endif %}
+  </div>
+{% endmacro %}
+
+{# ---------------------------------------------------------------------------
+   Freshness and the reporting clock. Both always show their as-of instant:
+   a deadline or a "current" claim without the instant it was true at is the
+   exact ambiguity §13.2 forbids.                                            #}
+
+{% macro freshness(as_of, source_label="Data as of") %}
+  <span class="freshness">
+    <span class="label">{{ source_label }}</span>
+    <span class="code">{{ as_of }}</span>
+  </span>
+{% endmacro %}
+
+{% macro deadline_clock(started_at, deadline_at, tz_label, as_of, tone="neutral", status_label=None) %}
+  <div class="clock clock-{{ tone }}">
+    <div class="flex items-baseline justify-between gap-2">
+      <span class="label">Reporting clock</span>
+      {% if status_label %}{{ badge(status_label, tone) }}{% endif %}
+    </div>
+    <dl class="clock-grid">
+      <div><dt class="label">Started</dt><dd class="code">{{ started_at or "Unknown" }}</dd></div>
+      <div><dt class="label">Deadline</dt><dd class="code">{{ deadline_at or "Unknown — review required" }}</dd></div>
+      <div><dt class="label">Timezone</dt><dd>{{ tz_label }}</dd></div>
+      <div><dt class="label">As of</dt><dd class="code">{{ as_of }}</dd></div>
+    </dl>
+  </div>
+{% endmacro %}
+
+{# ---------------------------------------------------------------------------
+   Queue chrome. The toolbar owns search/filter/sort/count; the rows themselves
+   are Phase 4 work, but the contract (result count + active-filter summary +
+   URL-preserved state) is fixed here so every queue inherits it.            #}
+
+{% macro queue_toolbar(result_count, active_filters=[]) %}
+  <div class="queue-toolbar">
+    <div class="queue-toolbar-controls">
+      {% if caller is defined %}{{ caller() }}{% endif %}
+    </div>
+    <p class="queue-toolbar-summary" role="status">
+      {{ result_count }} result{{ "" if result_count == 1 else "s" }}
+      {% if active_filters %}· filtered by {{ active_filters | join(", ") }}{% endif %}
+    </p>
+  </div>
+{% endmacro %}
+
+{# ---------------------------------------------------------------------------
+   Evidence and audit. Provenance is part of the object, not a footnote: an
+   evidence item without source type and retrieval method is decoration
+   (§8.5), and an audit row without actor/reason is a hash (§11.5).          #}
+
+{% macro evidence_item(source_type, title, provenance, status="reported", retrieved_at=None, href=None) %}
+  {# status: reported | derived | inferred | pending #}
+  <article class="evidence evidence-{{ status }}">
+    <header class="flex items-baseline justify-between gap-2">
+      <span class="label">{{ source_type }}</span>
+      {{ badge(status | capitalize, {"reported": "neutral", "derived": "ref",
+                                      "inferred": "warn-soft", "pending": "neutral"}[status]) }}
+    </header>
+    <p class="evidence-title">{% if href %}<a href="{{ href }}">{% endif %}{{ title }}{% if href %}</a>{% endif %}</p>
+    <p class="evidence-provenance">{{ provenance }}</p>
+    {% if retrieved_at %}<p class="evidence-retrieved">Retrieved <span class="code">{{ retrieved_at }}</span></p>{% endif %}
+  </article>
+{% endmacro %}
+
+{% macro audit_event(seq, actor, action, resource, when, reason=None) %}
+  <li class="audit-event">
+    <span class="code audit-event-seq">#{{ seq }}</span>
+    <span class="audit-event-main">
+      <strong>{{ actor }}</strong> · {{ action }} · <span class="code">{{ resource }}</span>
+      {% if reason %}<span class="audit-event-reason">— {{ reason }}</span>{% endif %}
+    </span>
+    <span class="code audit-event-when">{{ when }}</span>
+  </li>
+{% endmacro %}
+
+{# ---------------------------------------------------------------------------
+   Breadcrumb: the return path is a promise (§4 of the blueprint) — every deep
+   page renders one so a shared link never strands the reader.               #}
+
+{% macro breadcrumb(items) %}
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <ol>
+      {% for href, label in items %}
+      <li>{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}</li>
+      {% endfor %}
+    </ol>
+  </nav>
+{% endmacro %}

@@ -1,0 +1,722 @@
+{% from "_components.html" import notice_synthetic %}
+{# VITalWatch — public landing page (Phase 2, prompt.md §8).
+
+   This template does NOT extend base.html: the public shell is its own shell
+   (docs/phase1/04-shell-plan.md). It shares the design system — tokens.css,
+   fonts.css, the local Tailwind build, app.css primitives — and adds only
+   landing.css on top.
+
+   Data discipline (§6.5): every value in the hero preview is a STATIC,
+   LABELLED fixture that lives in this template and nowhere else. It queries
+   no operational table, because portfolio data is never public (main.py —
+   `_PUBLIC` lists exactly five public paths; everything else requires a
+   session). The fixture is labelled "Synthetic demonstration" where it
+   appears.
+
+   Post-merge reconciliation (2026-09-16): the seven-role lens model, the
+   investigation board, evidence retrieval (BM25/RRF) and the FHIR/SDTM
+   exports were deleted from the backend. This page now describes only what
+   the five-role backend actually ships: five personas, the escalation /
+   statutory-clock / corrective-action / leadership-decision workflow as the
+   signature experience, and no interchange-format claims of any kind. #}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="googlebot" content="noindex, nofollow, noarchive">
+  <meta name="description" content="VITalWatch — clinical-trial oversight and pharmacovigilance in one auditable workspace. A synthetic-data demonstration: safety intake with statutory reporting clocks, signal detection, an escalation and governance workflow, and an append-only audit trail.">
+  <title>{{ settings.app_name }} — See the risk. Follow the evidence. Act with confidence.</title>
+  {# The same self-hosted asset stack as every page (§6.1.1). No CDN request
+     renders this page; the display face (Fraunces) is optional and never
+     preloaded — the metric-matched fallback renders first. #}
+  <link rel="preload" href="/static/fonts/manrope-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/landing.css">
+</head>
+<body class="landing min-h-full antialiased">
+
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm">Skip to content</a>
+
+{# ---------------------------------------------------------------- masthead
+   Restrained public navigation (§8.3). The mobile drawer is a <details>
+   disclosure — a real menu that works with JavaScript disabled; landing.js
+   only adds Escape-to-close and close-on-navigate as enhancements. #}
+<header class="l-masthead">
+  <div class="l-progress" aria-hidden="true"></div>
+  <div class="l-masthead-inner">
+    <a href="/" class="l-brand">
+      <img src="/static/mark.svg" alt="" width="30" height="30" class="h-8 w-8">
+      <span class="l-brand-name">{{ settings.app_name }}</span>
+    </a>
+
+    <nav class="l-nav" aria-label="Primary">
+      <a href="#product">Product</a>
+      <a href="#how">How it works</a>
+      <a href="#roles">Roles</a>
+      <a href="#trust">Trust &amp; safety</a>
+      <a href="#about">About</a>
+      <a href="/docs">Docs</a>
+    </nav>
+
+    <div class="l-actions">
+      <a href="/login?next=/" class="btn btn-primary">Explore the demo</a>
+      <a href="/login" class="btn btn-secondary l-actions-signin">Sign in</a>
+    </div>
+
+    <details class="l-drawer" id="nav-drawer">
+      <summary aria-label="Open menu">Menu</summary>
+      <nav class="l-drawer-panel" aria-label="Primary — drawer">
+        <a href="#product">Product</a>
+        <a href="#how">How it works</a>
+        <a href="#roles">Roles</a>
+        <a href="#trust">Trust &amp; safety</a>
+        <a href="#about">About</a>
+        <a href="/docs">Docs</a>
+        <a href="/login" class="l-drawer-cta">Sign in</a>
+      </nav>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+
+{# ------------------------------------------------------------------ hero
+   §8.4.1: the thesis, one paragraph naming the domain, two CTAs, and a real
+   product preview in the first viewport. #}
+<section class="l-hero" aria-labelledby="hero-title">
+  <div class="l-wrap">
+    <div class="l-hero-grid">
+      <div>
+        <p class="l-eyebrow l-meta"><strong>Clinical-trial oversight · pharmacovigilance</strong></p>
+        <h1 id="hero-title">
+          <span class="l-hero-line"><span>See the risk.</span></span>
+          <span class="l-hero-line"><span>Follow the evidence.</span></span>
+          <span class="l-hero-line"><span>Act with confidence.</span></span>
+        </h1>
+        <p class="l-hero-sub">
+          {{ settings.app_name }} brings clinical-trial oversight and pharmacovigilance into
+          one auditable workspace — adverse-event intake with statutory reporting clocks,
+          safety-signal detection, an escalation workflow that pauses a trial until a
+          structured response is reviewed, and an audit trail that can prove it has not
+          been altered.
+        </p>
+        <div class="l-hero-ctas">
+          <a href="/login?next=/" class="btn btn-primary">Explore the demo</a>
+          <a href="#how" class="btn btn-secondary">See how it works</a>
+        </div>
+        <div class="l-hero-meta">
+          <span class="l-meta">Synthetic-data demonstration</span>
+          <span class="l-meta">Dataset snapshot <strong>2026-08-22</strong></span>
+          <span class="l-meta">No participant identifiable</span>
+        </div>
+
+        {# The reference-line motif at editorial scale (§6.1.2, item 4): the same
+           .ref mark the operational product uses at 8px, rendered here as the
+           page's graphic argument — no value means anything except against the
+           line it is measured by. Decorative; the idea is stated in copy. #}
+        <div class="l-refmotif" aria-hidden="true">
+          <div class="ref">
+            <div class="ref-fill" style="width: 81%"></div>
+            <div class="ref-mark" style="left: 78%"></div>
+          </div>
+          <div class="ref-legend">
+            <span>0</span>
+            <span class="at">the reference line — plan, threshold, deadline</span>
+            <span>target</span>
+          </div>
+        </div>
+      </div>
+
+      {# The product preview. A labelled static fixture (§6.5) composed from the
+         real primitives — .pill, .ref, .code, .evidence, .audit-event — so the
+         page's first proof of the product is the product's own visual language.
+         It shows, in one frame: a serious-event deadline in the queue, a signal
+         raised into a safety-concern escalation, the escalation package in the
+         inspector, and an audit event. #}
+      <figure class="l-preview" aria-labelledby="preview-title" data-hero>
+        <div class="l-preview-chrome">
+          <span class="l-meta">Safety Officer portal</span>
+          <span class="pill pill-neutral">Fixture</span>
+        </div>
+        <div class="l-preview-body">
+          <div class="l-preview-queue">
+            <p class="label" id="preview-title">Priority queue</p>
+            <div class="mt-2">
+              <div class="l-prow l-prow-breach">
+                <div class="l-prow-top">
+                  <span class="l-prow-title">SAE reporting clock</span>
+                  <span class="pill pill-breach">Breached</span>
+                </div>
+                <p class="l-prow-sub"><span class="code">AE-1042</span> · <span class="code">AYU-008</span> · 24h clock — <span class="code" data-tick="26:14">26:14</span> elapsed</p>
+              </div>
+              <div class="l-prow l-prow-review l-prow-on">
+                <div class="l-prow-top">
+                  <span class="l-prow-title">Signal above threshold</span>
+                  <span class="pill pill-review">Review</span>
+                </div>
+                <p class="l-prow-sub"><span class="code">hepatic discomfort</span> · PRR <span class="code">3.4</span> vs threshold <span class="code">2.0</span> · <span class="code">5</span> cases</p>
+              </div>
+              <div class="l-prow l-prow-within">
+                <div class="l-prow-top">
+                  <span class="l-prow-title">Enrolment vs plan</span>
+                  <span class="pill pill-within">On plan</span>
+                </div>
+                <div class="ref" role="img" aria-label="Enrolment 212 of 260, ahead of plan-to-date">
+                  <div class="ref-fill ref-fill-within" style="width: 81%"></div>
+                  <div class="ref-mark" style="left: 78%"></div>
+                </div>
+                <p class="l-prow-sub"><span class="code">AYU-008</span> · <span class="code">212 / 260</span> · mark = plan-to-date</p>
+              </div>
+            </div>
+            <span class="freshness"><span class="label">As of</span> <span class="code">page load — 2026-08-22 snapshot</span></span>
+          </div>
+          <div class="l-preview-inspector">
+            <p class="label">Inspector — signal in context</p>
+            <div class="mt-2">
+              <article class="evidence evidence-derived">
+                <header class="flex items-baseline justify-between gap-2">
+                  <span class="label">Derived pattern</span>
+                  <span class="pill pill-ref">Derived</span>
+                </header>
+                <p class="evidence-title">PRR screen — 5 coded cases, one term</p>
+                <p class="evidence-provenance">Triage order for human review. Not an incidence rate, not causation.</p>
+              </article>
+              <article class="evidence">
+                <header class="flex items-baseline justify-between gap-2">
+                  <span class="label">Escalation raised</span>
+                  <span class="pill pill-review">Open</span>
+                </header>
+                <p class="evidence-title">Safety-concern escalation <span class="code">ESC-021</span> raised from this signal</p>
+                <p class="evidence-provenance">Trial paused; statutory response clock started; PRR finding attached, awaiting human review.</p>
+              </article>
+              <ol class="mt-2 list-none p-0">
+                <li class="audit-event">
+                  <span class="code audit-event-seq">#1042</span>
+                  <span class="audit-event-main"><strong>safety.officer</strong> · coded term · <span class="code">AE-1042</span>
+                    <span class="audit-event-reason">— verbatim match</span></span>
+                  <span class="code audit-event-when">2026-08-22T09:41Z</span>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <figcaption>
+          <span class="l-meta"><strong>Synthetic demonstration</strong> — representative fixture</span>
+          <span class="l-meta">values are illustrative, not live telemetry</span>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- why
+   §8.4.2: the operational problem, told as disconnected fragments becoming
+   one traceable case. #}
+<section class="l-section" id="why" aria-labelledby="why-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">01 — Why it exists</span></div>
+    <h2 class="l-statement" id="why-title">Important events should not disappear inside routine activity.</h2>
+    <p class="l-lede mt-4">
+      Trial data, safety cases, evidence and compliance history usually live in different
+      places. A serious event can sit unremarked in a queue of routine ones; a statistical
+      signal means nothing until a human reviews it in context. Teams need to know
+      <strong>what changed, why it matters, who owns it, and what action is due</strong> —
+      and to prove the answer later.
+    </p>
+
+    <div class="l-converge">
+      <div class="l-frag" aria-label="Fragmented records, before">
+        <div class="l-frag-item" data-reveal style="--d:0"><span class="code">AE-1042</span> — narrative reported by a site, uncoded</div>
+        <div class="l-frag-item" data-reveal style="--d:1"><span class="code">PRR 3.4</span> — a ratio in a spreadsheet, unexamined</div>
+        <div class="l-frag-item" data-reveal style="--d:2"><span class="code">24:00:00</span> — a statutory clock, started nowhere</div>
+        <div class="l-frag-item" data-reveal style="--d:3"><span class="code">enrolment 212</span> — a count without its plan-to-date</div>
+      </div>
+      <div class="l-converge-arrow" aria-hidden="true" data-reveal style="--d:4">
+        <svg width="46" height="60" viewBox="0 0 46 60" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4 6 C 26 6, 26 30, 42 30 M4 54 C 26 54, 26 30, 42 30 M4 30 L 42 30" stroke-dasharray="3 4"/>
+        </svg>
+        <span class="l-meta">becomes</span>
+      </div>
+      <div class="l-case" aria-label="One traceable case, after" data-reveal style="--d:5">
+        <div class="l-case-row"><span>One case, one owner, one clock</span><span class="pill pill-review">Review</span></div>
+        <div class="l-case-row"><span>Coded at intake</span><span class="code">hepatic discomfort</span></div>
+        <div class="l-case-row"><span>Reporting clock started at intake</span><span class="code">17:46 remaining</span></div>
+        <div class="l-case-row"><span>Screened against the portfolio</span><span class="code">PRR 3.4 ≥ 2.0</span></div>
+        <div class="l-case-row"><span>Every step retained</span><span class="code">audit #1039…#1042</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- what
+   §8.4.3: five connected pillars, each with a real interface state or diagram
+   and an anchor to deeper content. #}
+<section class="l-section" id="product" aria-labelledby="product-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">02 — What it is</span></div>
+    <h2 class="l-statement" id="product-title">Five connected pillars, one record of the truth.</h2>
+    <p class="l-lede mt-4">
+      Each pillar is built and demonstrable in the demo today. Each is honest about where
+      it stops — the boundary is part of the feature, not a footnote.
+    </p>
+
+    <div class="l-pillars">
+      <div class="l-pillar" data-reveal style="--d:0">
+        <div class="l-pillar-diagram" aria-hidden="true">
+          <div class="ref"><div class="ref-fill ref-fill-within" style="width: 64%"></div><div class="ref-mark" style="left: 70%"></div></div>
+          <span class="code text-[0.65rem]">enrolment 64% · plan-to-date 70%</span>
+        </div>
+        <h3>Trial oversight</h3>
+        <p>Live metrics for every trial, read against their reference lines. Enrolment is read against plan-to-date, so a young trial is never flagged for being young.</p>
+        <p class="l-pillar-link"><a href="#how">How a metric becomes a queue →</a></p>
+      </div>
+
+      <div class="l-pillar" data-reveal style="--d:1">
+        <div class="l-pillar-diagram" aria-hidden="true">
+          <span class="code text-[0.65rem]">started 2026-08-22T09:14Z</span>
+          <span class="code text-[0.65rem]">deadline +24h · <span style="color:var(--breach)">breached 26:14</span></span>
+        </div>
+        <h3>Safety intake &amp; reporting clocks</h3>
+        <p>Adverse events are coded as the narrative arrives, and the statutory reporting clock starts the moment an event is marked serious — under the New Drugs &amp; Clinical Trials Rules, 2019 framing.</p>
+        <p class="l-pillar-link"><a href="#faq">What the clocks do not record →</a></p>
+      </div>
+
+      <div class="l-pillar" data-reveal style="--d:2">
+        <div class="l-pillar-diagram" aria-hidden="true">
+          <div class="ref"><div class="ref-fill ref-fill-review" style="width: 85%"></div><div class="ref-mark" style="left: 50%"></div></div>
+          <span class="code text-[0.65rem]">PRR 3.4 · threshold 2.0 · ≥3 cases</span>
+        </div>
+        <h3>Signal detection &amp; escalation</h3>
+        <p>Coded terms are screened by proportional reporting ratio — a triage order for human review, never a verdict. A flagged term can be raised straight into a safety-concern escalation, with the PRR finding attached for the reviewer.</p>
+        <p class="l-pillar-link"><a href="#trust">Why detection stops at review →</a></p>
+      </div>
+
+      <div class="l-pillar" data-reveal style="--d:3">
+        <div class="l-pillar-diagram" aria-hidden="true">
+          <span class="code text-[0.65rem]">raised → responded → reviewed → decided</span>
+          <span class="code text-[0.65rem]">actor, role and timestamp on every step</span>
+        </div>
+        <h3>Escalation &amp; decision workflow</h3>
+        <p>An escalation carries the raised facts, the company's nine-field structured response, the reviewer's resolve-or-escalate decision, and leadership's reasoned final decision — each step distinct, named and timestamped.</p>
+        <p class="l-pillar-link"><a href="#how">The five-stage workflow →</a></p>
+      </div>
+
+      <div class="l-pillar l-pillar-wide" data-reveal style="--d:4">
+        <div class="l-pillar-diagram" aria-hidden="true">
+          <span class="code text-[0.65rem]">#1042 · prev 9f3e…c21a → 7bd1…e88f · append-only · UPDATE/DELETE refused by the database</span>
+        </div>
+        <h3>Audit &amp; data integrity</h3>
+        <p>Every material change is written to an append-only, hash-linked chain with actor, role, action, reason and before/after state. Verification walks the chain and names the first altered row — the guarantee is enforced by the database itself, not by the application being careful.</p>
+        <p class="l-pillar-link"><a href="#trust">What verification guarantees — and what it cannot →</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- how
+   §8.4.4 + §6.1.2: the signature text-art path. An ordered list first, art
+   second — fully readable with no CSS, no JS, and reduced motion (§6.1.3). #}
+<section class="l-section" id="how" aria-labelledby="how-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">03 — How it works</span></div>
+    <h2 class="l-statement" id="how-title">One workflow, from detection to proof.</h2>
+    <p class="l-lede mt-4">
+      Every stage states its input, what the system derives, the decision a human must
+      take, the evidence retained — and what the system does not claim.
+    </p>
+
+    <nav class="l-pathnav" aria-label="Jump to a workflow stage" data-reveal>
+      <a href="#stage-detect">01 Detect</a>
+      <a href="#stage-understand">02 Understand</a>
+      <a href="#stage-investigate">03 Investigate</a>
+      <a href="#stage-decide">04 Decide</a>
+      <a href="#stage-prove">05 Prove</a>
+    </nav>
+
+    <ol class="l-path">
+      <li class="l-stage" id="stage-detect" data-reveal>
+        <div class="l-stage-word"><span class="l-stage-no">Stage 01</span>Detect</div>
+        <dl class="l-stage-facts">
+          <div><dt>Input</dt><dd>Site-reported adverse-event narratives, visit and enrolment data as they arrive.</dd></div>
+          <div><dt>System derives</dt><dd>Coded terms, statutory reporting clocks started at intake, PRR screening across coded terms, alerts ranked by severity.</dd></div>
+          <div><dt>Human decides</dt><dd>Whether an event is serious; whether a flagged pattern merits review.</dd></div>
+          <div><dt>Evidence kept</dt><dd>The original narrative, the coded term, the intake timestamp, the clock state.</dd></div>
+          <div class="l-stage-noclaim"><dt>Not claimed</dt><dd>A flagged ratio is a triage order, not a safety finding.</dd></div>
+        </dl>
+      </li>
+      <li class="l-stage" id="stage-understand" data-reveal>
+        <div class="l-stage-word"><span class="l-stage-no">Stage 02</span>Understand</div>
+        <dl class="l-stage-facts">
+          <div><dt>Input</dt><dd>A flagged term, a deadline, a metric that moved.</dd></div>
+          <div><dt>System derives</dt><dd>Context in one place — the cases behind a ratio, the trial behind a deadline, enrolment against plan-to-date, and the freshness of every value.</dd></div>
+          <div><dt>Human decides</dt><dd>Whether context explains the pattern, or the pattern survives context.</dd></div>
+          <div><dt>Evidence kept</dt><dd>The values as of the moment they were read — every figure carries its as-of instant.</dd></div>
+          <div class="l-stage-noclaim"><dt>Not claimed</dt><dd>Incidence and causation. Sub-threshold rows stay visible so the criterion can be seen doing its work.</dd></div>
+        </dl>
+      </li>
+      <li class="l-stage" id="stage-investigate" data-reveal>
+        <div class="l-stage-word"><span class="l-stage-no">Stage 03</span>Investigate</div>
+        <dl class="l-stage-facts">
+          <div><dt>Input</dt><dd>A pattern worth a human's time — raised as a protocol-deviation or safety-concern escalation.</dd></div>
+          <div><dt>System derives</dt><dd>The escalation package: the raised facts, the trial's paused state, the statutory response clock, and — for safety concerns — the AI signal finding with its engine version, confidence and review state.</dd></div>
+          <div><dt>Human decides</dt><dd>The company responds in nine mandatory structured fields; the raising role decides whether that response resolves the concern or goes to leadership.</dd></div>
+          <div><dt>Evidence kept</dt><dd>Every transition — actor, role, timestamp, and the full text of each structured field, never truncated.</dd></div>
+          <div class="l-stage-noclaim"><dt>Not claimed</dt><dd>An AI finding is not a medical conclusion; it stays unreviewed until a named human disposes of it.</dd></div>
+        </dl>
+      </li>
+      <li class="l-stage" id="stage-decide" data-reveal>
+        <div class="l-stage-word"><span class="l-stage-no">Stage 04</span>Decide</div>
+        <dl class="l-stage-facts">
+          <div><dt>Input</dt><dd>The assembled package, escalated to leadership when the response does not resolve it.</dd></div>
+          <div><dt>System derives</dt><dd>A structured decision record — continue, pause, resume, request further review, or terminate — with a mandatory reason and individually tracked conditions.</dd></div>
+          <div><dt>Human decides</dt><dd>The decision. Always. The system never decides, never auto-closes.</dd></div>
+          <div><dt>Evidence kept</dt><dd>Before and after state for every material change.</dd></div>
+          <div class="l-stage-noclaim"><dt>Not claimed</dt><dd>That an external authority received anything — this system records no external submission receipts.</dd></div>
+        </dl>
+      </li>
+      <li class="l-stage" id="stage-prove" data-reveal>
+        <div class="l-stage-word"><span class="l-stage-no">Stage 05</span>Prove</div>
+        <dl class="l-stage-facts">
+          <div><dt>Input</dt><dd>Any material change.</dd></div>
+          <div><dt>System derives</dt><dd>An append-only audit row — actor, role, action, reason, timestamp — hash-linked to the row before it. Verification names the first altered row.</dd></div>
+          <div><dt>Human decides</dt><dd>When to verify.</dd></div>
+          <div><dt>Evidence kept</dt><dd>Everything. UPDATE and DELETE are refused by the database itself.</dd></div>
+          <div class="l-stage-noclaim"><dt>Not claimed</dt><dd>The chain proves entries were not altered after the fact — it cannot prove they were honest when written.</dd></div>
+        </dl>
+      </li>
+    </ol>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- roles
+   §8.4.5: persona selector. Radio inputs — no JavaScript required, keyboard
+   native, and incapable of implying a permission change. Exactly the five
+   roles of app/models.py::UserRole — no sixth persona is implied. #}
+<section class="l-section" id="roles" aria-labelledby="roles-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">04 — Who it helps</span></div>
+    <h2 class="l-statement" id="roles-title">Built for the people who carry the trial.</h2>
+
+    <fieldset class="l-roles" aria-describedby="roles-note" data-reveal>
+      <legend id="roles-note">
+        Five roles sign in to the demo — one account per role; the selector below previews
+        what each one is for. It changes this page's content only — permissions are granted
+        by the signed-in account and enforced by the server, never by a control on a public page.
+      </legend>
+
+      <input class="l-role-input" type="radio" name="l-role" id="l-role-vol" checked>
+      <label class="l-role-label" for="l-role-vol">Volunteer / participant</label>
+      <input class="l-role-input" type="radio" name="l-role" id="l-role-co">
+      <label class="l-role-label" for="l-role-co">Company</label>
+      <input class="l-role-input" type="radio" name="l-role" id="l-role-inv">
+      <label class="l-role-label" for="l-role-inv">Investigator</label>
+      <input class="l-role-input" type="radio" name="l-role" id="l-role-saf">
+      <label class="l-role-label" for="l-role-saf">Safety Officer</label>
+      <input class="l-role-input" type="radio" name="l-role" id="l-role-lea">
+      <label class="l-role-label" for="l-role-lea">Leadership</label>
+
+      <div class="l-role-panels">
+        <div class="l-role-panel l-role-panel-vol">
+          <p class="l-role-question">“What is the state of my participation?”</p>
+          <div class="l-role-cols">
+            <div><h4>Sees first</h4><p>Their own trial, upcoming appointments, consent status and history, and the adverse-event self-report form — nothing else.</p></div>
+            <div><h4>Value</h4><p>Registration, consent and reporting in one place, with the currently published consent form shown before any decision is asked for.</p></div>
+            <div><h4>Boundary</h4><p>Strictly scoped to their own participant record — a volunteer cannot see another participant's row, and the schema has no name or date-of-birth field anywhere to see.</p></div>
+          </div>
+        </div>
+        <div class="l-role-panel l-role-panel-co">
+          <p class="l-role-question">“What does my trial need from me right now?”</p>
+          <div class="l-role-cols">
+            <div><h4>Sees first</h4><p>Pending escalations awaiting the company's structured response, the full escalation history, and the operations screen for eligibility criteria, forms and appointments.</p></div>
+            <div><h4>Value</h4><p>The response is nine mandatory fields — explanation through responsible person — so a corrective-action plan arrives complete, not assembled over email.</p></div>
+            <div><h4>Boundary</h4><p>The company responds; it never reviews its own response and never decides the outcome — that belongs to the raising role and to leadership.</p></div>
+          </div>
+        </div>
+        <div class="l-role-panel l-role-panel-inv">
+          <p class="l-role-question">“Which submissions and escalations need my decision today?”</p>
+          <div class="l-role-cols">
+            <div><h4>Sees first</h4><p>Registration submissions awaiting an eligibility decision and protocol-deviation escalations awaiting review, with the AI pre-screen finding beside each submission.</p></div>
+            <div><h4>Value</h4><p>The AI pre-screen is visible with its confidence — but the eligibility decision is the investigator's, and the record names them.</p></div>
+            <div><h4>Boundary</h4><p>Trial access is selected from the trial list, not assigned — the demo has no stored “my trials” ownership, and the interface says so rather than implying it.</p></div>
+          </div>
+        </div>
+        <div class="l-role-panel l-role-panel-saf">
+          <p class="l-role-question">“Which event or reporting obligation requires attention next?”</p>
+          <div class="l-role-cols">
+            <div><h4>Sees first</h4><p>Uncoded adverse events, PRR-ranked signals and safety-concern escalations, with the 24-hour / 14-day statutory clocks derived live at read time.</p></div>
+            <div><h4>Value</h4><p>Coding assistance suggests a term with its match basis; the officer confirms, corrects, or leaves it uncoded — the suggestion never codes the record by itself.</p></div>
+            <div><h4>Boundary</h4><p>Clocks are computed from intake. The system does not record that an external authority received a filing.</p></div>
+          </div>
+        </div>
+        <div class="l-role-panel l-role-panel-lea">
+          <p class="l-role-question">“Is the institution safe, compliant, and inspection-ready?”</p>
+          <div class="l-role-cols">
+            <div><h4>Sees first</h4><p>Escalations under leadership review, portfolio KPIs, and live audit-chain verification — with global search and the audit trail reserved to this role.</p></div>
+            <div><h4>Value</h4><p>Final decisions carry a mandatory reason and individually tracked conditions; verification walks the chain and names the first altered row.</p></div>
+            <div><h4>Boundary</h4><p>“Chain verified” certifies the integrity of stored records — not the organization, the deployment, or regulatory compliance. Leadership oversees everything and conducts nothing.</p></div>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- trust
+   §8.4.6: the trust properties, then the monospace evidence chain (§6.1.2,
+   item 2) given its proper home. #}
+<section class="l-section" id="trust" aria-labelledby="trust-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">05 — Trust &amp; safety</span></div>
+    <h2 class="l-statement" id="trust-title">Trust is engineered, not asserted.</h2>
+
+    <div class="l-trust-grid">
+      <div class="l-trust-item" data-reveal style="--d:0"><h3>Evidence is visible</h3><p>Every claim on screen links to the record it came from. Raised facts, AI-generated findings and human decisions are visually distinct — always.</p></div>
+      <div class="l-trust-item" data-reveal style="--d:1"><h3>Patterns stop at human review</h3><p>Detection produces a triage order. A human reviews, a human decides, and the decision record names them.</p></div>
+      <div class="l-trust-item" data-reveal style="--d:2"><h3>Uncertainty is shown</h3><p>Missing or unevaluable data renders as unknown — dotted, labelled, never silently zero. Conflicting and incomplete states are designed, not improvised.</p></div>
+      <div class="l-trust-item" data-reveal style="--d:3"><h3>Freshness is stated</h3><p>Deadlines and metrics carry their as-of instant. Stale data is marked stale and shows when it was last known good.</p></div>
+      <div class="l-trust-item" data-reveal style="--d:4"><h3>Changes keep their history</h3><p>Material mutations retain before and after state. Nothing material is silently overwritten — the audit row carries actor, role, action, reason and timestamp.</p></div>
+      <div class="l-trust-item" data-reveal style="--d:5"><h3>Data is minimized</h3><p>The demonstration schema has no name, no date of birth and no resolvable identifier to put real participant data into. Pseudonymous codes are the records.</p></div>
+    </div>
+
+    <figure class="l-chain" aria-labelledby="chain-title">
+      <div class="l-kicker"><span class="l-meta" id="chain-title">The evidence chain — a record becomes tamper-evident</span></div>
+      <div class="l-chain-track">
+        <div class="l-chain-stage">
+          <span class="l-meta">Source record — as reported</span>
+          <pre aria-label="Raw adverse-event intake record"><span class="c-dim">intake</span>  <span class="c-key">AE-1042</span>   <span class="c-dim">2026-08-22T09:14Z</span>
+<span class="c-key">trial</span>  <span class="c-val">AYU-008</span>  <span class="c-key">participant</span> <span class="c-val">AYU-008-014</span>
+<span class="c-key">verbatim</span> <span class="c-val">"loose motions since yesterday,</span>
+          <span class="c-val">mild dehydration"</span>
+<span class="c-key">serious</span>  <span class="c-warn">yes → 24h clock started</span></pre>
+        </div>
+        <div class="l-chain-becomes" aria-hidden="true" data-reveal style="--d:1">becomes</div>
+        <div class="l-chain-stage" data-reveal style="--d:2">
+          <span class="l-meta">Append-only audit row — retained forever</span>
+          <pre aria-label="The same event as a hash-linked audit row"><span class="c-dim">seq</span>     <span class="c-key">#1042</span>
+<span class="c-dim">actor</span>   <span class="c-val">safety.officer</span>  <span class="c-dim">role</span> <span class="c-val">safety_officer</span>
+<span class="c-dim">action</span>  <span class="c-val">coded_term</span>  <span class="c-dim">reason</span> <span class="c-val">"verbatim match — curated vocabulary"</span>
+<span class="c-dim">before</span>  <span class="c-val">∅</span>  <span class="c-dim">after</span> <span class="c-val">hepatic discomfort</span>
+<span class="c-dim">prev</span>    <span class="c-key" data-hash="9f3e…c21a">9f3e…c21a</span> <span class="c-dim">→</span> <span class="c-key" data-hash="7bd1…e88f">7bd1…e88f</span>  <span class="c-ok">chain intact</span></pre>
+        </div>
+      </div>
+      <figcaption class="l-prose" data-reveal style="--d:3">
+        <p>
+          <strong>What this guarantees:</strong> entries are append-only, each committing to the hash of
+          the entry before it; UPDATE and DELETE are refused by the database itself, so the
+          guarantee holds even if the application does not; verification walks the chain and names
+          the first altered row. <strong>What it cannot guarantee:</strong> that an entry was honest when
+          written — the chain proves the history was not altered after the fact, and that distinction
+          is stated wherever the feature is described.
+        </p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- proof
+   §8.4.7: honest proof points only — and the claims we deliberately do not
+   make, because the absence of invention is itself the proof. #}
+<section class="l-section" id="proof" aria-labelledby="proof-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">06 — Proof points</span></div>
+    <h2 class="l-statement" id="proof-title">What is true — and what we do not claim.</h2>
+
+    <div class="l-about-grid">
+      <div>
+        <ul class="l-proof list-none p-0" data-reveal style="--d:0">
+          <li><span><strong>Synthetic data, clearly labelled.</strong> Every record is generated; the dataset is anchored to a fixed snapshot (2026-08-22) and regenerates identically from a fixed seed.</span></li>
+          <li><span><strong>Material mutations are audited.</strong> Writes carry actor, role, reason and before/after state into an append-only chain you can verify yourself in the demo.</span></li>
+          <li><span><strong>Pattern detection stops at human review.</strong> PRR screening produces a triage order with its criterion visible; no automated conclusion is ever recorded.</span></li>
+          <li><span><strong>AI findings stay human-gated.</strong> Eligibility pre-screens, coding suggestions and signal findings persist with engine version, input summary and confidence — and stay unreviewed until a named human disposes of them.</span></li>
+          <li><span><strong>Database boundaries are defined.</strong> The same application runs on SQLite for the demo and Postgres for deployment, with an identical audit-chain head hash on both.</span></li>
+        </ul>
+      </div>
+      <div>
+        <ul class="l-proof l-proof-noclaim list-none p-0" data-reveal style="--d:1">
+          <li><span><strong>No customer logos, no patient outcomes.</strong> There are none to show, and none are invented. This page carries no testimonials and no adoption claims.</span></li>
+          <li><span><strong>No regulatory approvals or compliance certifications.</strong> Nothing here is certified, validated, or approved for clinical use by any authority.</span></li>
+          <li><span><strong>No licensed dictionaries.</strong> MedDRA and WHODrug are commercial and are not used; coding runs against a curated vocabulary written for this demonstration.</span></li>
+          <li><span><strong>No live external integrations — and no export surface.</strong> No EDC feed, no ABDM exchange, no FHIR/SDTM export, no external submission receipts — each is a stated boundary, not a hidden gap.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- about
+   §8.4.8: context, audience, architecture, demo-vs-production, non-goals. #}
+<section class="l-section" id="about" aria-labelledby="about-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">07 — About</span></div>
+    <h2 class="l-statement" id="about-title">A demonstration of what safety-critical software should feel like.</h2>
+
+    <div class="l-about-grid">
+      <div class="l-prose" data-reveal style="--d:0">
+        <p>
+          {{ settings.app_name }} is a <strong>demonstration system</strong> for clinical-trial oversight and
+          pharmacovigilance, framed on the AYUSH clinical-research context — the regulatory
+          vocabulary of the New Drugs &amp; Clinical Trials Rules 2019, CTRI registration, the
+          DPDP Act 2023, and ALCOA+ data-integrity principles. It is built for the people who
+          evaluate, study and design safety-critical workflows: clinical operations teams,
+          pharmacovigilance officers, researchers and reviewers.
+        </p>
+        <p>
+          The design goal is <strong>operational clarity in safety-critical work</strong>: no value without
+          its reference line, no deadline without its as-of instant, no pattern presented as a
+          conclusion, and no history that cannot prove itself. The fictional trial
+          <span class="code">AYU-008</span> and its constituents are invented for this repository,
+          and their provenance says so wherever they appear.
+        </p>
+        <p>
+          <strong>This is not production software.</strong> It is not clinically validated, not approved by
+          any regulatory authority, and not affiliated with or endorsed by any institution it
+          references for context. Its non-goals are deliberate: no live EDC integration, no ABDM
+          exchange, no external submission receipts, no licensed dictionaries, no participant
+          identifiers of any kind. Where a capability is planned rather than built, the interface
+          says so — planned features are never faked.
+        </p>
+      </div>
+      <div class="l-arch" data-reveal style="--d:1">
+        <h3>High-level architecture</h3>
+        <ul class="list-none p-0 m-0">
+          <li><span class="code">FastAPI + Jinja</span> — server-rendered pages; no client framework, no hidden state.</li>
+          <li><span class="code">SQLite · Postgres</span> — one data layer, both drivers, boundary documented.</li>
+          <li><span class="code">append-only audit</span> — hash-linked events; UPDATE/DELETE refused by the database.</li>
+          <li><span class="code">PRR signal screening</span> — a named threshold and case floor, derived on every read, never cached.</li>
+          <li><span class="code">escalation state machine</span> — raise → structured response → review → leadership decision, audited at every transition.</li>
+          <li><span class="code">session auth · role gates · CSRF</span> — every page requires a session; every write requires a permitted role.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------------- faq
+   §8.4.9: the boundary questions, in plain language, progressively disclosed. #}
+<section class="l-section" id="faq" aria-labelledby="faq-title">
+  <div class="l-wrap">
+    <div class="l-kicker"><span class="l-meta">08 — FAQ &amp; boundaries</span></div>
+    <h2 class="l-statement" id="faq-title">Asked plainly, answered plainly.</h2>
+
+    <div class="l-faq" data-reveal>
+      <details>
+        <summary>Is this production clinical software?</summary>
+        <p>No. It is a synthetic-data demonstration. It is not clinically validated, not approved by any regulatory authority, and not intended for patient care. The engineering it demonstrates — session authentication, role-gated writes, CSRF protection, append-only audit — is real; the data and the deployment context are not.</p>
+      </details>
+      <details>
+        <summary>Is the data real?</summary>
+        <p>No. Every trial, participant code, adverse event and audit entry is generated by a seeded fixture anchored to 2026-08-22. The schema contains no field that could hold a real participant's name, date of birth or resolvable identifier — minimization enforced by design, not by policy.</p>
+      </details>
+      <details>
+        <summary>Does it replace medical judgement?</summary>
+        <p>No. The system detects, organizes and retains; humans decide. Signal screening produces a triage order with its criterion visible, an escalation carries its evidence and its AI finding's review state openly, and every decision record requires a named human's rationale. Nothing is auto-closed and no conclusion is automated.</p>
+      </details>
+      <details>
+        <summary>Which dictionaries are used for coding?</summary>
+        <p>A curated vocabulary written for this demonstration — not MedDRA and not WHODrug, which are commercial, subscription-licensed dictionaries. The intake coder tolerates misspellings, classical terminology and cross-site synonyms, and every coded term is labelled with its vocabulary source.</p>
+      </details>
+      <details>
+        <summary>How are permissions enforced?</summary>
+        <p>By the server, on every request. Every page and API route requires a signed-in session; every write additionally requires a role permitted to perform that action. Interface controls merely reflect those rules — a hidden button is never the security boundary, and a link never leads to a screen the reader would be refused.</p>
+      </details>
+      <details>
+        <summary>What does audit-chain verification guarantee — and not guarantee?</summary>
+        <p>It guarantees the recorded history has not been altered after the fact: entries are append-only and hash-linked, the database refuses UPDATE and DELETE on the chain, and verification names the first altered row. It cannot guarantee an entry was truthful when written, and it does not prove any external authority received a filing — the system records no external receipts.</p>
+      </details>
+      <details>
+        <summary>Which integrations are demonstrated?</summary>
+        <p>None, live — and that is a stated boundary, not a hidden gap. There is no EDC feed, no ABDM exchange, no regulatory gateway and no FHIR/SDTM export surface in this build. What is demonstrated end-to-end is the database boundary: the same application runs on SQLite and Postgres, with an identical audit-chain head hash on both.</p>
+      </details>
+      <details>
+        <summary>What should users do when data is incomplete, stale, conflicting, or urgent?</summary>
+        <p>Incomplete data renders as <em>unknown</em>, never as zero. Stale data is labelled with when it was last known good. Conflicting states are shown with both values and their sources. And anything genuinely urgent is a filled, unmissable badge — urgency is spent only where action is actually required. In the real world, an urgent safety event follows your institution's escalation procedure, not a demo's queue.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+{# ------------------------------------------------------------------- CTA
+   §8.8: end with the next steps, then the footer with identity and the
+   consolidated synthetic-data notice (the shared macro — one copy source). #}
+<section class="l-cta" aria-labelledby="cta-title">
+  <div class="l-wrap">
+    <h2 id="cta-title">Explore the demonstration.</h2>
+    <p>
+      Sign in with any of the five demo accounts — one per role — and walk the workflow
+      yourself: file a synthetic adverse event, watch its clock start, screen a signal,
+      raise a safety-concern escalation, work it through response and review, then verify
+      the audit chain recorded all of it.
+    </p>
+    <div class="l-cta-row">
+      <a href="/login?next=/" class="btn btn-primary">Explore the demo</a>
+      <a href="/login" class="btn btn-secondary">Sign in</a>
+      <a href="/docs" class="btn btn-quiet">Read documentation</a>
+      <a href="#about" class="btn btn-quiet">About &amp; trust</a>
+    </div>
+  </div>
+</section>
+
+<footer class="l-footer">
+  <div class="l-wrap">
+    <div class="l-footer-grid">
+      <div>
+        <div class="l-footer-brand">
+          <img src="/static/mark.svg" alt="" width="26" height="26" class="h-7 w-7">
+          <span>{{ settings.app_name }}</span>
+        </div>
+        <p class="l-footer-note">
+          Clinical-trial oversight and pharmacovigilance, demonstrated on synthetic data in
+          the AYUSH research context. A demonstration project — not a product, not a service,
+          not affiliated with the institutions it references for regulatory framing.
+        </p>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <ul>
+          <li><a href="#why">Why it exists</a></li>
+          <li><a href="#product">What it is</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#roles">Roles</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Project</h3>
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#faq">FAQ &amp; boundaries</a></li>
+          <li><a href="#trust">Trust &amp; safety</a></li>
+          <li><a href="/docs">Documentation / API</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Accessibility &amp; conduct</h3>
+        <ul>
+          <li>Works with JavaScript disabled</li>
+          <li>Respects reduced-motion preferences</li>
+          <li>Keyboard-operable throughout</li>
+          <li>Status never carried by colour alone</li>
+        </ul>
+      </div>
+    </div>
+    <div class="l-footer-legal">
+      {{ notice_synthetic("footer") }}
+      <span>WCAG 2.2 AA-oriented. Maintained as a demonstration project.</span>
+    </div>
+  </div>
+</footer>
+
+{# Progressive enhancement only: Escape closes the drawer and returns focus to
+   its trigger; choosing a destination closes it too. With JavaScript disabled
+   the drawer still works — it is a <details> element. #}
+<script src="/static/landing.js" defer></script>
+
+</body>
+</html>

@@ -1,0 +1,198 @@
+{#- VITalWatch — reusable queue chrome (Phase 4, prompt.md §10.2).
+
+   One set of macros for every queue-shaped surface (AE register, signals,
+   escalation inbox, operational alerts, audit trail). Row *content* stays in
+   the surface templates — an AE row carries a statutory clock and an audit row
+   carries a hash, and no über-macro should pretend otherwise. What is shared
+   is the contract: search scoped to identifiers, allowlisted filters, an
+   explicit sort, honest counts, URL-preserved state, and pagination that is a
+   set of real links so it works with JavaScript disabled.
+
+   State discipline (§10.2): saved views and bulk actions are NOT offered —
+   there is no persistence or bulk-mutation backend, and durable features must
+   be backed by real capability or explicitly absent, never faked. The URL is
+   the saved view; the summary line says so once, plainly.
+-#}
+
+
+{# Build a query string from the cleaned params echo with overrides applied.
+   override value None drops the key. Extra keyword args arrive via Jinja's
+   `kwargs`. Used for filter chips, sort toggles and page links — every
+   state-changing link on a queue goes through here so no template ever
+   hand-assembles a URL and drops a param. #}
+{% macro qs(params) -%}
+  {%- set merged = dict(params) -%}
+  {%- for k, v in kwargs.items() -%}
+    {%- if v is none -%}
+      {%- set _ = merged.pop(k, '') -%}
+    {%- else -%}
+      {%- set _ = merged.update({k: v | string}) -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {{- merged | urlencode -}}
+{%- endmacro %}
+
+
+{# The toolbar: one GET form per queue. Submitting resets to page 1 (a filter
+   change invalidates the old page number); the current sort direction is
+   preserved in a hidden input. The direction flip is a separate link so a
+   reader can reverse any sort in one click without resubmitting. #}
+{% macro queue_toolbar(action, result, filters, sorts, search_placeholder, dynamic_options={}) %}
+<form method="get" action="{{ action }}" class="q-toolbar" role="search" aria-label="Filter this queue">
+  <div class="q-toolbar-row">
+    <label class="q-search">
+      <span class="sr-only">{{ search_placeholder }}</span>
+      <input type="search" name="q" value="{{ result.q }}" placeholder="{{ search_placeholder }}"
+             class="field" autocomplete="off">
+    </label>
+    {% for f in filters %}
+    <label class="q-filter">
+      <span class="label">{{ f.label }}</span>
+      <select name="{{ f.param }}" class="field">
+        <option value="">All</option>
+        {% for value, label in dynamic_options.get(f.param, f.options) %}
+        <option value="{{ value }}" {{ 'selected' if result.params.get(f.param) == value else '' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endfor %}
+    <label class="q-filter">
+      <span class="label">Sort</span>
+      <select name="sort" class="field">
+        {% for s in sorts %}
+        <option value="{{ s.param }}" {{ 'selected' if result.sort.param == s.param else '' }}>{{ s.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if result.params.get('dir') %}<input type="hidden" name="dir" value="{{ result.params['dir'] }}">{% endif %}
+    <button type="submit" class="btn btn-secondary">Apply</button>
+    <a class="q-dirflip" href="{{ action }}?{{ qs(result.params, dir='asc' if result.desc else 'desc', page=None) }}"
+       title="Reverse the current sort direction"
+       aria-label="Reverse the current sort direction">⇅</a>
+  </div>
+</form>
+{% endmacro %}
+
+
+{# Result count + active-filter summary + clear-all (§10.2 requires all three).
+   The "bookmark" line is the honest saved-view substitute: persistence is
+   declared absent, and the URL is what you keep. #}
+{% macro queue_summary(result, action, noun, extra_note=None) %}
+<div class="q-summary" role="status">
+  <p class="q-summary-count">
+    {% if result.filtered %}
+      <strong>{{ result.matched }}</strong> of {{ result.total }} {{ noun }}
+    {% else %}
+      {{ result.total }} {{ noun }}
+    {% endif %}
+    {% if result.matched > 0 %}
+      <span class="q-summary-range">· showing {{ result.showing_from }}–{{ result.showing_to }}</span>
+    {% endif %}
+  </p>
+  {% if result.active %}
+  <ul class="q-chips" aria-label="Active filters">
+    {% for f in result.active %}<li class="q-chip">{{ f }}</li>{% endfor %}
+    <li><a class="q-chip-clear" href="{{ action }}">Clear all</a></li>
+  </ul>
+  {% elif result.q %}
+  <ul class="q-chips" aria-label="Active filters">
+    <li class="q-chip">Search: “{{ result.q }}”</li>
+    <li><a class="q-chip-clear" href="{{ action }}">Clear</a></li>
+  </ul>
+  {% endif %}
+  <p class="q-summary-note">
+    {{ extra_note or 'Bookmark this URL to keep this view — named saved views and bulk actions are not built (no persistence behind them).' }}
+  </p>
+</div>
+{% endmacro %}
+
+
+{# Sortable column header for the rare surface that still renders a true table
+   (audit). Queues of record cards use the toolbar sort instead. #}
+{% macro sort_th(action, result, label, param, num=False) %}
+<th class="{{ 'num' if num else '' }}">
+  <a class="q-sortlink {{ 'q-sortlink-on' if result.sort == param else '' }}"
+     href="{{ action }}?{{ qs(result.params, sort=param, dir='asc' if (result.sort == param and result.dir == 'desc') else none, page=None) }}">
+    {{ label }}
+    {% if result.sort == param %}<span aria-hidden="true">{{ '↑' if result.dir == 'asc' else '↓' }}</span>
+      <span class="sr-only">(sorted {{ 'ascending' if result.dir == 'asc' else 'descending' }})</span>{% endif %}
+  </a>
+</th>
+{% endmacro %}
+
+
+{# Pagination: real links, a compact window around the current page, and an
+   honest "page N of M". No infinite scroll — position in a regulated record
+   set must be stable enough to cite. #}
+{% macro pagination(action, result) %}
+{% if result.pages > 1 %}
+<nav class="q-pages" aria-label="Queue pages">
+  {% if result.page > 1 %}
+    <a class="q-page" href="{{ action }}?{{ qs(result.params, page=result.page - 1) }}" rel="prev">← Prev</a>
+  {% else %}
+    <span class="q-page q-page-off" aria-disabled="true">← Prev</span>
+  {% endif %}
+  {% for p in range(1, result.pages + 1) %}
+    {% if p == 1 or p == result.pages or (p - result.page) | abs <= 2 %}
+      {% if p == result.page %}
+        <span class="q-page q-page-on" aria-current="page">{{ p }}</span>
+      {% else %}
+        <a class="q-page" href="{{ action }}?{{ qs(result.params, page=p) }}">{{ p }}</a>
+      {% endif %}
+    {% elif (p - result.page) | abs == 3 %}
+      <span class="q-page-gap" aria-hidden="true">…</span>
+    {% endif %}
+  {% endfor %}
+  {% if result.page < result.pages %}
+    <a class="q-page" href="{{ action }}?{{ qs(result.params, page=result.page + 1) }}" rel="next">Next →</a>
+  {% else %}
+    <span class="q-page q-page-off" aria-disabled="true">Next →</span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+
+{# The empty states, distinguished per §10.1: "no records at all" and "no
+   matches for this filter" are different messages with different next actions. #}
+{% macro queue_empty(result, action, noun, empty_title, empty_body) %}
+  {% if result.total == 0 %}
+  <div class="state state-empty" data-empty-reason="no_records">
+    <p class="state-title">{{ empty_title }}</p>
+    <p class="state-body">{{ empty_body }}</p>
+  </div>
+  {% elif result.matched == 0 %}
+  <div class="state state-empty" data-empty-reason="no_matches">
+    <p class="state-title">No {{ noun }} match this view.</p>
+    <p class="state-body">
+      {% if result.q %}The search “{{ result.q }}” matched no identifiers. {% endif %}
+      {% if result.active %}Active filters: {{ result.active | join(', ') }}. {% endif %}
+      Broaden the view or clear it to see the full set.
+    </p>
+    <a class="btn btn-secondary" href="{{ action }}">Clear filters</a>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+
+{# The worklist + inspector mount (§7.2). Rendered once per inspectable queue.
+   The panel starts empty and hidden; inspector.js owns its lifecycle. The
+   initial markup is a real loading shell, not a blank frame, so a slow fetch
+   never reads as an empty record (§10.1). #}
+{% macro inspector_mount(list_label) %}
+<div class="inspector-root" data-inspector hidden>
+  <aside class="inspector" role="dialog" aria-modal="false" aria-label="Record inspector"
+         data-inspector-panel tabindex="-1">
+    <div class="inspector-head">
+      <span class="label">Quick review — {{ list_label }}</span>
+      <button type="button" class="btn-quiet inspector-close" data-inspector-close aria-label="Close inspector (Escape)">✕</button>
+    </div>
+    <div class="inspector-body" data-inspector-body aria-live="polite">
+      <div class="state state-loading" role="status">
+        <p class="state-title">Loading…</p>
+        <p class="state-body">The queue stays where it is while the record loads.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endmacro %}

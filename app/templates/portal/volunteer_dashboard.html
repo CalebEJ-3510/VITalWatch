@@ -1,0 +1,234 @@
+{#-
+  portal/volunteer_dashboard.html — the Volunteer / Participant dashboard (spec sections 4, 40).
+
+  Five widgets and four quick actions, exactly the section's list:
+    my trial · upcoming appointments · consent status · my reports · participation status
+    (quick actions: register, view consent, view appointment, report a symptom)
+
+  Identity rule (roadmap P3, conflict C1): a participant sees ONLY their own
+  records. That must be a query-level scope enforced by the route — every row
+  below is fetched by the route for THIS participant and rendered verbatim.
+  The pseudonymity claim is stated on the page, not left as a footnote: the
+  participant code is the only identity this system shows.
+
+  Context contract (all fetched by the route for the signed-in participant;
+  the portal_* shell variables are inherited from portal/_base.html):
+
+    participant           dict|None  a `participants` row (participant_code, trial_id,
+                                      site_id, screened_date, enrolled_date, status, arm,
+                                      consent_version, consent_date)
+    my_trial              dict|None  the `trials` row the participant belongs to, or None
+    appointments          list       this participant's `visits` rows, soonest first
+                                      (visit_name, scheduled_date, window_days, status,
+                                      actual_date)
+    consent               dict|None  {"version", "date", "status"} — status:
+                                      accepted | rejected | pending
+    consent_history       list       older consent events, newest first:
+                                      {"version", "date", "status", "actor"}
+    my_reports            list       this participant's `adverse_events` rows, newest
+                                      first (id, reported_at, severity, outcome,
+                                      coded_term, timeline_status, narrative)
+    registration          dict|None  the participant's registration submission state:
+                                      {"form_version", "submitted_at", "status"}
+    quick_actions         list       [(label, href, hint), ...] — defaults to the four
+                                      section 40 actions when the route omits it
+    report_action         str        POST target of the symptom self-report form
+                                      (default "/portal/volunteer/reports"; the route must
+                                      land the report in the Safety Officer's worklist)
+    pending_notifications list       optional {"label","href","tone"} for the shell tray
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head %}
+{% from "portal/_partials.html" import p_metric, p_status_badge, p_clock_badge, p_quick_action, p_empty, p_toolkit_start, p_toolkit_end, p_panel_head %}
+
+{% set portal_id = 'volunteer' %}
+{% set portal_label = 'Volunteer portal' %}
+{% set portal_crumbs = [('Dashboard', None)] %}
+{% set trial_id = my_trial.id if my_trial else (participant.trial_id if participant else None) %}
+{% set portal_nav_sections = [
+  ('My participation', [
+    ('/portal/volunteer', 'Dashboard', None),
+    ('/trial/' ~ trial_id if trial_id else '#', 'My trial', None),
+    ('#appointments', 'Appointments', None),
+    ('#consent', 'Consent', None),
+    ('#reports', 'My reports', None),
+  ]),
+  ('Take action', [
+    ('/portal/volunteer/register', 'Register for a trial', None),
+    ('#report', 'Report a symptom', None),
+  ]),
+] %}
+{% set portal_notifications = pending_notifications | default([]) %}
+{% set actions = quick_actions | default([
+  ('Register for a trial', '/portal/volunteer/register', 'Fill the published registration form for an open trial.'),
+  ('View my consent', '#consent', 'Read the published consent version and record your decision.'),
+  ('View my appointments', '#appointments', 'Your visit schedule and any changes.'),
+  ('Report a symptom', '#report', 'Tell the study team about something that happened.'),
+]) %}
+
+{% block portal_main %}
+{% call page_head('Welcome back' if participant else 'Volunteer dashboard',
+                  'Your trial, your consent, your visits and your reports — only your own records, by code.') %}{% endcall %}
+
+{% if not participant %}
+  <section class="panel p-6 text-center">
+    <p class="text-sm text-slate-500">No participant record is linked to this session yet.
+       Use <a class="font-medium text-[color:var(--reference)] hover:underline" href="/portal/volunteer/register">Register for a trial</a>
+       to start — or ask the study team to link your code.</p>
+  </section>
+{% else %}
+
+  {# ---- the five section 40 widgets ------------------------------------------- #}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    {{ p_metric('My trial', my_trial.id if my_trial else '—',
+                (my_trial.status | label ~ ' · ' ~ my_trial.phase) if my_trial else 'not linked to a trial',
+                tone='neutral', href='/trial/' ~ my_trial.id if my_trial else None,
+                definition='The one trial this participant is registered in. A participant belongs to exactly one trial.') }}
+    {{ p_metric('Participation status', participant.status | label,
+                'screened ' ~ (participant.screened_date | d) ~ (' · enrolled ' ~ (participant.enrolled_date | d) if participant.enrolled_date else ''),
+                tone={'enrolled': 'good', 'screening': 'warn', 'withdrawn': 'neutral'}.get(participant.status, 'neutral'),
+                definition='participants.status for this participant row: enrolled, screening or withdrawn.') }}
+    {{ p_metric('Upcoming appointments', appointments | length,
+                (appointments[0].title ~ ' · ' ~ (appointments[0].scheduled_at | d)) if appointments else 'none scheduled',
+                tone='warn' if appointments else 'good', href='#appointments',
+                definition='Appointments scheduled for this participant that have not yet been completed.') }}
+    {{ p_metric('Consent status',
+                (consent.status | label) if consent else 'not on file',
+                (('v' ~ consent.version ~ ' · ' ~ (consent.date | d)) if consent else ''),
+                tone={'accepted': 'good', 'rejected': 'bad', 'pending': 'warn'}.get(consent.status if consent else 'pending', 'warn'),
+                href='#consent',
+                definition='The consent version this participant accepted (or rejected), and when. Consent is a record, not a one-time flag.') }}
+    {{ p_metric('My reports', my_reports | length,
+                (my_reports | selectattr('timeline_status', 'equalto', 'breached') | list | length ~ ' past deadline') if my_reports else 'nothing reported',
+                tone='bad' if my_reports | selectattr('timeline_status', 'equalto', 'breached') | list else 'neutral',
+                href='#reports',
+                definition='Adverse events and symptom reports filed by or for this participant.') }}
+  </div>
+
+  {# ---- the four section 40 quick actions -------------------------------------- #}
+  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for qa_label, qa_href, qa_hint in actions %}
+      {{ p_quick_action(qa_label, qa_href, qa_hint) }}
+    {% endfor %}
+  </div>
+
+  {# ---- upcoming appointments --------------------------------------------------- #}
+  <section class="panel mt-6 overflow-hidden" id="appointments">
+    {{ p_panel_head('Upcoming appointments', appointments | length ~ ' scheduled') }}
+    <div class="tbl-scroll"><table class="tbl" id="tbl-appointments">
+      <thead>
+        <tr><th data-sort>Visit</th><th data-sort>Scheduled</th><th data-sort>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for v in appointments %}
+        <tr>
+          <td class="font-medium text-slate-700">{{ v.title }}</td>
+          <td class="text-slate-600">{{ v.scheduled_at | dt }}</td>
+          <td>{{ p_status_badge(v.status) }}</td>
+        </tr>
+        {% else %}
+        {{ p_empty(3, 'No appointments are scheduled. The study team will book your visits.') }}
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {{ p_toolkit_end('tbl-appointments') }}
+  </section>
+
+  <div class="mt-5 grid items-start gap-5 lg:grid-cols-2">
+    {# ---- consent status + history --------------------------------------------- #}
+    <section class="panel p-5" id="consent">
+      <h2 class="panel-title">Consent</h2>
+      {% if published_consent %}
+      <div class="mt-3 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-medium">Published version <span class="code">{{ published_consent.version_no }}</span></span>
+          <span class="text-xs text-slate-400">{{ published_consent.published_at | d }}</span>
+        </div>
+        <p class="mt-2 whitespace-pre-wrap leading-relaxed">{{ published_consent.content }}</p>
+      </div>
+      {% if consent and consent.version == published_consent.version_no %}
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        {{ p_status_badge(consent.status) }}
+        <span class="text-sm text-slate-700">your decision for version <span class="code">{{ consent.version }}</span></span>
+        <span class="text-xs text-slate-400">{{ consent.date | d }}</span>
+      </div>
+      {% else %}
+      <form method="post" action="/portal/volunteer/consent" class="mt-4 flex flex-wrap gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" name="decision" value="accepted" class="btn btn-primary px-4 py-2">Accept this consent version</button>
+        <button type="submit" name="decision" value="rejected" class="btn btn-secondary px-4 py-2">Reject this consent version</button>
+      </form>
+      <p class="mt-2 text-xs text-slate-500">Your decision is recorded with the published version and timestamp. It does not replace an Investigator eligibility decision.</p>
+      {% endif %}
+      {% else %}
+      <p class="mt-3 text-sm text-slate-500">No published consent form is available for your trial yet. The study team must publish a version before you can decide.</p>
+      {% endif %}
+      {% if consent_history %}
+      <ul class="mt-4 divide-y divide-slate-100">
+        {% for h in consent_history %}
+        <li class="flex items-baseline justify-between gap-3 py-2 text-[12.5px]">
+          <span class="text-slate-600">v{{ h.version }} — {{ h.status | label }}</span>
+          <span class="tabular-nums text-slate-400">{{ h.date | d }}{% if h.actor %} · {{ h.actor }}{% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
+    {# ---- my reports ------------------------------------------------------------- #}
+    <section class="panel overflow-hidden" id="reports">
+      {{ p_panel_head('My reports', 'newest first') }}
+      <ul class="divide-y" style="border-color:var(--rule)">
+        {% for r in my_reports[:5] %}
+        <li class="alert">
+          {{ p_clock_badge(r.timeline_status) }}
+          <span class="alert-trial code">{{ r.id[:8] }}</span>
+          <span class="text-slate-600">{{ r.narrative[:80] }}{{ '…' if r.narrative | length > 80 else '' }}</span>
+          <span class="ml-auto text-[11px] tabular-nums text-slate-400">{{ r.reported_at | dt }}</span>
+        </li>
+        {% else %}
+        <li class="px-4 py-6 text-center text-sm text-slate-400">You have not reported anything yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+
+  {# ---- symptom self-report — lands in the Safety Officer's worklist ------------ #}
+  <section class="panel mt-5 p-5" id="report">
+    <h2 class="panel-title">Report a symptom or something that happened</h2>
+    <p class="mt-1 text-[12.5px] leading-relaxed text-slate-500">
+      This goes straight to the study team and, if marked serious, to the Safety Officer's
+      worklist with the statutory reporting clock started. Say what happened in your own
+      words — the coding happens after you submit, not before.
+    </p>
+    <form method="post" action="{{ report_action | default('/portal/volunteer/reports') }}" class="mt-4 grid gap-3 sm:grid-cols-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="block text-sm sm:col-span-2">
+        <span class="label">What happened? <span class="text-[color:var(--breach)]" aria-hidden="true">*</span></span>
+        <textarea name="narrative" required rows="3" class="field mt-1"
+                  placeholder="e.g. On the second day after my last visit I had a fever and felt generally unwell."></textarea>
+      </label>
+      <label class="block text-sm">
+        <span class="label">First noticed on <span class="text-[color:var(--breach)]" aria-hidden="true">*</span></span>
+        <input type="date" name="onset_date" required class="field mt-1">
+      </label>
+      <div class="flex items-end gap-4 pb-1 text-[12.5px] text-slate-600">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" name="serious" value="1" class="h-4 w-4">
+          This is serious (hospitalisation, or it worries me a lot)
+        </label>
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" class="btn btn-primary px-5 py-2">Send to the study team</button>
+      </div>
+    </form>
+  </section>
+
+  <p class="mt-4 text-[11.5px] leading-relaxed text-slate-500">
+    You are identified in this system only by your participant code
+    (<span class="code">{{ participant.participant_code }}</span>). No name or date of birth
+    is stored anywhere in the trial database — that is by design (DPDP Act 2023), not a gap.
+  </p>
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,189 @@
+{% from "_components.html" import notice_synthetic %}
+{# VITalWatch — sign-in (Phase 6, prompt.md §16).
+
+   The authentication gateway, redesigned in the Direction B register so the
+   public entrance (landing) and the gate read as one product: editorial panel
+   on the left, working form on the right.
+
+   Demo quick-fill: five chips, one per UserRole, each carrying the fixed
+   demo-only credentials that README.md and .env.example already publish.
+   A chip FILLS the form — it never signs in by itself and never grants
+   anything; permissions come from the authenticated account and are enforced
+   by the server on every request. With JavaScript disabled the chips are
+   inert buttons, so every credential is also printed on its chip for manual
+   entry — the page works either way. #}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Sign in — {{ settings.app_name }}</title>
+  {# Same self-hosted asset stack as base.html — no CDN request renders any page. #}
+  <link rel="preload" href="/static/fonts/manrope-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/login.css">
+</head>
+<body class="auth min-h-full antialiased">
+
+<a href="#signin-form" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm">Skip to the sign-in form</a>
+
+<main class="auth-grid">
+
+  {# ------------------------------------------------- editorial panel (left)
+     The product thesis at the gate, in the same register as the landing hero —
+     dark institution ground, display face, the reference-line motif. Hidden
+     below 900px where it collapses to a compact brand band. #}
+  <section class="auth-side" aria-label="About this demonstration">
+    <div class="auth-side-inner">
+      <a href="/" class="auth-brand" aria-label="{{ settings.app_name }} — back to the home page">
+        <img src="/static/mark.svg" alt="" width="34" height="34">
+        <span class="auth-brand-name">{{ settings.app_name }}</span>
+      </a>
+
+      <p class="l-meta auth-side-kicker"><strong>Clinical-trial oversight · pharmacovigilance</strong></p>
+      <h1 class="auth-side-title">
+        <span class="auth-line"><span>See the risk.</span></span>
+        <span class="auth-line"><span>Follow the evidence.</span></span>
+        <span class="auth-line"><span>Act with confidence.</span></span>
+      </h1>
+      <p class="auth-side-sub">
+        One auditable workspace for safety intake with statutory reporting clocks,
+        signal detection, an escalation and decision workflow, and an audit trail
+        that can prove it has not been altered.
+      </p>
+
+      <div class="auth-refmotif" aria-hidden="true">
+        <div class="ref">
+          <div class="ref-fill auth-ref-fill"></div>
+          <div class="ref-mark" style="left: 78%"></div>
+        </div>
+        <div class="ref-legend">
+          <span>0</span>
+          <span class="at">the reference line — plan, threshold, deadline</span>
+          <span>target</span>
+        </div>
+      </div>
+
+      <div class="auth-side-meta">
+        <span class="l-meta">Synthetic-data demonstration</span>
+        <span class="l-meta">Dataset snapshot <strong>2026-08-22</strong></span>
+        <span class="l-meta">No participant identifiable</span>
+      </div>
+    </div>
+  </section>
+
+  {# ------------------------------------------------------- form panel (right) #}
+  <section class="auth-main" aria-label="Sign in">
+    <div class="auth-card">
+
+      <div class="auth-card-head">
+        <a href="/" class="auth-brand auth-brand-compact" aria-label="{{ settings.app_name }} — back to the home page">
+          <img src="/static/mark.svg" alt="" width="28" height="28">
+          <span class="auth-brand-name">{{ settings.app_name }}</span>
+        </a>
+        <h2>Sign in</h2>
+        <p>
+          Every page and API route requires a session. This is a synthetic-data
+          prototype — pick a demo account below or type its credentials.
+        </p>
+      </div>
+
+      {% if error %}
+      <div class="auth-error" role="alert">
+        <strong>Sign-in failed.</strong> {{ error }} Check the username and password and try again.
+      </div>
+      {% endif %}
+
+      <form method="post" action="/login" id="signin-form" class="auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="auth-field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" required autocomplete="username" autofocus spellcheck="false">
+        </div>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit" id="signin-submit">Sign in</button>
+      </form>
+
+      {# ---------------------------------------------- demo quick-fill chips
+         One chip per UserRole. The button fills the form via login.js; the
+         credentials are printed on the chip so the page is fully usable with
+         JavaScript disabled. These are the fixed demo-only credentials that
+         README.md publishes — rotate them before any real deployment. #}
+      <div class="auth-demo" role="group" aria-labelledby="demo-title">
+        <div class="auth-demo-head">
+          <h3 id="demo-title">Demo accounts — one per role</h3>
+          <p>Choose one to fill the form, then sign in. The account, never this page, determines what you can see and do.</p>
+        </div>
+
+        <ul class="auth-chips list-none p-0 m-0">
+          <li>
+            <button type="button" class="auth-chip" data-username="volunteer.demo" data-password="CtmsVolunteer#01"
+                    aria-label="Fill the form with the Volunteer demo account">
+              <span class="auth-chip-top"><span class="auth-chip-role">Volunteer / participant</span><span class="auth-chip-go" aria-hidden="true">fill →</span></span>
+              <span class="auth-chip-cred"><span class="code">volunteer.demo</span> · <span class="code">CtmsVolunteer#01</span></span>
+              <span class="auth-chip-what">My participation: appointments, consent, self-report.</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="auth-chip" data-username="company.demo" data-password="AiiaCompany#01"
+                    aria-label="Fill the form with the Company demo account">
+              <span class="auth-chip-top"><span class="auth-chip-role">Company</span><span class="auth-chip-go" aria-hidden="true">fill →</span></span>
+              <span class="auth-chip-cred"><span class="code">company.demo</span> · <span class="code">AiiaCompany#01</span></span>
+              <span class="auth-chip-what">Escalations awaiting the nine-field structured response.</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="auth-chip" data-username="investigator.demo" data-password="AiiaTrialLead#01"
+                    aria-label="Fill the form with the Investigator demo account">
+              <span class="auth-chip-top"><span class="auth-chip-role">Investigator</span><span class="auth-chip-go" aria-hidden="true">fill →</span></span>
+              <span class="auth-chip-cred"><span class="code">investigator.demo</span> · <span class="code">AiiaTrialLead#01</span></span>
+              <span class="auth-chip-what">Eligibility decisions and protocol-deviation review.</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="auth-chip" data-username="safety.demo" data-password="AiiaSafety#01"
+                    aria-label="Fill the form with the Safety Officer demo account">
+              <span class="auth-chip-top"><span class="auth-chip-role">Safety Officer</span><span class="auth-chip-go" aria-hidden="true">fill →</span></span>
+              <span class="auth-chip-cred"><span class="code">safety.demo</span> · <span class="code">AiiaSafety#01</span></span>
+              <span class="auth-chip-what">The safety queue: coding, statutory clocks, signals, escalations.</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="auth-chip" data-username="leadership.demo" data-password="AiiaLeadership#01"
+                    aria-label="Fill the form with the Leadership demo account">
+              <span class="auth-chip-top"><span class="auth-chip-role">Leadership</span><span class="auth-chip-go" aria-hidden="true">fill →</span></span>
+              <span class="auth-chip-cred"><span class="code">leadership.demo</span> · <span class="code">AiiaLeadership#01</span></span>
+              <span class="auth-chip-what">Pending decisions, portfolio KPIs, audit-chain verification.</span>
+            </button>
+          </li>
+        </ul>
+
+        <p class="auth-demo-note">
+          Fixed demo-only credentials, published in README.md — rotate every one
+          before any deployment that is not a disposable demo.
+          <noscript>JavaScript is off, so quick-fill is unavailable — type the credentials shown on any chip above.</noscript>
+        </p>
+      </div>
+
+      <p class="auth-foot trust-stack">
+        {{ notice_synthetic("footer") }}
+      </p>
+    </div>
+  </section>
+</main>
+
+{# Progressive enhancement only: chips fill the form. Without this file the
+   credentials remain readable on every chip and the form submits normally. #}
+<script src="/static/login.js" defer></script>
+
+</body>
+</html>

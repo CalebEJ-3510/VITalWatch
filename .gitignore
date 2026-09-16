@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/*.db
+.DS_Store
+
+# Runtime data — the database is generated from a fixed seed, never committed.
+data/
+
+# Node artefacts from the deleted scaffold, in case anything reappears.
+node_modules/
+.next/
+
+# Local regression test caches and scratch databases.
+.pytest_cache/
+pytest-of-*/
+.coverage
+# AI assistant artifacts
+.workbuddy-ai/
+
+# Verification test outputs
+media-output/
+
+# Rehearsal sandbox scratch (scripts/rehearse.py writes a throwaway DB under a
+# vitalwatch-rehearse-* temp dir) — never committed.
+vitalwatch-rehearse-*/
+rehearsal.db
+

@@ -1,0 +1,456 @@
+/* VITalWatch — Phase 4: work queues, inspector, trial workspace (prompt.md §10).
+   ---------------------------------------------------------------------------
+   Loaded after app.css. Every colour, radius, duration and shadow comes from
+   tokens.css; nothing here introduces a hue. The three component contracts:
+
+   · Queue rows adapt by CONTAINER query, not viewport (§6.2) — the same row
+     must compress whether it renders full-width or beside the inspector.
+   · Status is never colour alone: a tinted row always carries a text pill;
+     the left edge is reinforcement, not the message (§6.3).
+   · The inspector's motion uses --motion-deliberate, which the reduced-motion
+     block in tokens.css zeroes out (§7.5). No scroll hijacking, ever. */
+
+
+/* --- toolbar ---------------------------------------------------------------- */
+
+.q-toolbar {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.q-toolbar-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2) var(--space-3); }
+.q-search { flex: 1 1 14rem; min-width: 11rem; }
+.q-search .field { width: 100%; }
+.q-filter { display: block; }
+.q-filter .field { margin-top: .15rem; min-width: 8.5rem; }
+.q-dirflip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; margin-bottom: 1px;
+  border: 1px solid var(--rule-strong); border-radius: var(--radius-sm);
+  color: var(--muted); text-decoration: none; font-size: .95rem;
+  transition: color var(--motion-instant) var(--ease-standard),
+              border-color var(--motion-instant) var(--ease-standard);
+}
+.q-dirflip:hover { color: var(--ink); border-color: var(--muted); }
+
+/* --- summary: counts, active filters, honest note --------------------------- */
+
+.q-summary { margin: 0 0 var(--space-3); }
+.q-summary-count { font-size: var(--type-body); color: var(--ink-2); }
+.q-summary-count strong { font-variant-numeric: tabular-nums; }
+.q-summary-range { color: var(--muted); font-variant-numeric: tabular-nums; }
+.q-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; list-style: none; padding: 0; }
+.q-chip {
+  font-size: var(--type-small); color: var(--ink-2);
+  background: var(--reference-2); border: 1px solid var(--reference-rule);
+  border-radius: var(--radius-pill); padding: .12rem .6rem;
+}
+.q-chip-clear { font-size: var(--type-small); color: var(--reference); }
+.q-chip-clear:hover { text-decoration: underline; }
+.q-summary-note { margin-top: .45rem; font-size: var(--type-label); color: var(--faint); }
+
+/* --- the queue itself ---------------------------------------------------------
+   A list of record rows, not a table: bulk comparison is not the job of an
+   operational queue, scanning-and-acting is (§10.4). The grid is
+   [flag | main | state]; below the component's narrow breakpoint the state
+   block drops under the main block instead of crushing it. */
+
+.q-list {
+  list-style: none; margin: 0; padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: clip;
+  container-type: inline-size;   /* the row responds to the space it is given */
+}
+.q-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: .3rem var(--space-3);
+  align-items: start;
+  padding: var(--density-row-y) var(--density-cell-x);
+  border-top: 1px solid var(--rule);
+  transition: background-color var(--motion-instant) var(--ease-standard);
+}
+.q-row:first-child { border-top: 0; }
+.q-row:hover { background: var(--surface-sunk); }
+.q-row:focus-within { background: var(--surface-sunk); }
+
+/* Row tones: a TINTED background plus a mandatory text pill in the markup.
+   .q-row-breach is a tint, never the solid fill — solid fill is reserved for
+   the pill itself (the existing pill-breach / pill-breach-soft rule). */
+.q-row-breach { background: var(--breach-bg); }
+.q-row-breach:hover { background: #fde8e8; }
+.q-row-warn { background: var(--review-bg); }
+.q-row-warn:hover { background: #fdf3dd; }
+
+/* Selected row: the reference edge. Indigo marks "where you currently stand"
+   in the token system's single meaning — the open record is exactly that. */
+.q-row-selected { box-shadow: inset 3px 0 0 var(--reference); }
+.q-row-selected:hover { background: var(--reference-2); }
+
+.q-row-flag { padding-top: .2rem; white-space: nowrap; }
+.q-row-main { min-width: 0; }
+.q-row-idline { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .55rem; }
+.q-row-id { font-family: var(--font-mono); font-size: var(--type-body); font-weight: 600; color: var(--ink); text-decoration: none; }
+.q-row-id:hover { color: var(--reference); text-decoration: underline; }
+.q-row-ctx { font-size: var(--type-small); color: var(--muted); }
+.q-row-reason {
+  margin: .18rem 0 0; font-size: var(--type-body); line-height: 1.5; color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.q-row-meta { margin: .22rem 0 0; font-size: var(--type-label); color: var(--faint); }
+.q-row-state { text-align: right; display: grid; justify-items: end; gap: .2rem; max-width: 16rem; }
+.q-row-due { font-size: var(--type-small); font-variant-numeric: tabular-nums; color: var(--muted); }
+.q-row-due-bad { color: var(--breach); font-weight: 600; }
+.q-row-action { font-size: var(--type-small); font-weight: 600; color: var(--reference); text-decoration: none; }
+.q-row-action:hover { text-decoration: underline; }
+
+/* The component-level narrow breakpoint (§6.2): the row given < 30rem stacks
+   rather than squeezes — the same rule whether the constraint is the viewport
+   (390px phone) or the inspector taking the right half of the screen. */
+@container (max-width: 30rem) {
+  .q-row { grid-template-columns: minmax(0, 1fr); }
+  .q-row-flag { padding-top: 0; }
+  .q-row-state { text-align: left; justify-items: start; grid-auto-flow: column; align-items: center; gap: .5rem; max-width: none; }
+}
+
+/* --- pagination ------------------------------------------------------------- */
+
+.q-pages { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: var(--space-3); align-items: center; }
+.q-page {
+  min-width: 2rem; text-align: center;
+  padding: .3rem .55rem; font-size: var(--type-small); font-variant-numeric: tabular-nums;
+  color: var(--ink-2); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: var(--radius-sm); background: var(--surface);
+}
+.q-page:hover { border-color: var(--muted); color: var(--ink); }
+.q-page-on { background: var(--action); color: var(--action-ink); border-color: var(--action); font-weight: 600; }
+.q-page-off { color: var(--faint); background: var(--surface-sunk); }
+.q-page-gap { color: var(--faint); padding: 0 .15rem; }
+
+/* --- sortable table headers (the audit trail's true table) ------------------- */
+
+.q-sortlink { color: inherit; text-decoration: none; white-space: nowrap; }
+.q-sortlink:hover { color: var(--ink); text-decoration: underline; }
+.q-sortlink-on { color: var(--ink); font-weight: 650; }
+
+/* --- the inspector (§7.2) ------------------------------------------------------
+   A side panel on wide screens, a full page below the drawer breakpoint —
+   never a sliver. It is modeless on desktop: the queue behind it stays
+   interactive so the next row loads into the same panel. The selected row
+   keeps the reference edge and the URL carries ?inspect=<id>, so a copied
+   link reopens the same state. */
+
+.inspector-root { position: fixed; inset: 0; z-index: var(--z-inspector); pointer-events: none; }
+.inspector {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: min(30rem, 92vw);
+  background: var(--surface);
+  border-left: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-lift);
+  display: flex; flex-direction: column;
+  pointer-events: auto;
+  transform: translateX(102%);
+  transition: transform var(--motion-deliberate) var(--ease-standard);
+}
+.inspector-root.is-open .inspector { transform: translateX(0); }
+.inspector-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: .7rem var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-sunk);
+}
+.inspector-close { font-size: .9rem; line-height: 1; }
+.inspector-body { flex: 1; overflow-y: auto; padding: var(--space-4); }
+.inspector-body .panel { box-shadow: none; }
+
+/* Below the shell's drawer breakpoint the side panel becomes the whole page.
+   640px matches the documented token note in tokens.css (drawers replace side
+   panels below 640px); the 390px acceptance width sits well inside it. */
+@media (max-width: 640px) {
+  .inspector { width: 100vw; border-left: 0; }
+}
+
+/* --- case record (full page + inspector fragment share these) ----------------- */
+
+.fact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: var(--space-3) var(--space-4); }
+.fact-grid dt { font-size: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--faint); margin-bottom: .15rem; }
+.fact-grid dd { font-size: var(--type-body); color: var(--ink-2); overflow-wrap: anywhere; }
+
+/* --- trial workspace: persistent context header + subviews (§10.3) ------------- */
+
+.ctx-head {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: var(--space-4) var(--space-4) 0;
+  margin-bottom: var(--space-4);
+}
+.ctx-head-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-2) var(--space-6); }
+.ctx-head-title { font-size: 1.05rem; font-weight: 650; letter-spacing: -.012em; color: var(--ink); line-height: 1.3; }
+.ctx-head-ids { margin-top: .3rem; display: flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: var(--type-small); color: var(--muted); }
+.ctx-head-ids .code { font-size: var(--type-small); }
+.ctx-head-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: var(--space-3); }
+.ctx-head-asof { font-size: var(--type-label); color: var(--faint); white-space: nowrap; }
+.ctx-head-action {
+  margin-top: var(--space-3); padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--review-rule); background: var(--review-bg); border-radius: var(--radius-sm);
+  font-size: var(--type-small); color: var(--review);
+}
+.ctx-head-action strong { color: var(--ink-2); }
+.ctx-head-action.calm { border-color: var(--within-rule); background: var(--within-bg); color: var(--within); }
+
+/* Subview tabs — real links to real subviews (each is a shareable URL), with
+   aria-current on the active one. They name an entity's actual sections
+   (Overview, Enrollment, Safety…), never a lens and never a fake hierarchy. */
+.subnav {
+  display: flex; flex-wrap: wrap; gap: 0; margin-top: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.subnav a {
+  display: inline-block; padding: .55rem .8rem;
+  font-size: var(--type-body); color: var(--muted); text-decoration: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color var(--motion-instant) var(--ease-standard);
+}
+.subnav a:hover { color: var(--ink); }
+.subnav a[aria-current="page"] { color: var(--ink); font-weight: 650; border-bottom-color: var(--reference); }
+.subnav .subnav-count {
+  font-size: var(--type-label); color: var(--faint); font-variant-numeric: tabular-nums;
+  margin-left: .25rem;
+}
+.subnav a[aria-current="page"] .subnav-count { color: var(--reference); }
+
+/* --- milestone timeline (§10.3 Timeline subview) --------------------------------
+   Server-computed geometry over the milestones table — planned vs actual on a
+   shared scale, drawn only where both are stored. The indigo line is "today":
+   the reference every planned date is measured against, which is the token's
+   one reserved meaning. No curve is fabricated from a single current total. */
+
+.tl { list-style: none; margin: 0; padding: 0; position: relative; container-type: inline-size; }
+.tl-row {
+  display: grid; grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr) auto;
+  gap: .2rem var(--space-3); align-items: center;
+  padding: .55rem 0; border-top: 1px solid var(--rule);
+}
+.tl-row:first-child { border-top: 0; }
+.tl-label { font-size: var(--type-body); font-weight: 600; color: var(--ink-2); }
+.tl-when { font-size: var(--type-label); color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.tl-track { position: relative; height: 1.35rem; }
+.tl-track::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px;
+  background: var(--rule); border-radius: 2px;
+}
+.tl-today {
+  position: absolute; top: -0.25rem; bottom: -0.25rem; width: 2px; margin-left: -1px;
+  background: var(--reference); border-radius: 2px;
+}
+.tl-today::after {
+  content: "today"; position: absolute; top: -1.05rem; left: 50%; transform: translateX(-50%);
+  font-size: .6rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--reference);
+}
+.tl-slip { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: var(--breach-hi); border-radius: 2px; }
+.tl-early { background: var(--within-hi); }
+.tl-mark {
+  position: absolute; top: 50%; width: .65rem; height: .65rem; margin: -0.325rem 0 0 -0.325rem;
+  border-radius: 50%;
+}
+.tl-plan { background: var(--surface); border: 2px solid var(--rule-strong); }
+.tl-actual { background: var(--within); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--within-rule); }
+.tl-actual.late { background: var(--breach); box-shadow: 0 0 0 1px var(--breach-rule); }
+.tl-awaiting { background: var(--surface); border: 2px dashed var(--review); }
+.tl-legend { display: flex; flex-wrap: wrap; gap: .3rem var(--space-4); margin-top: var(--space-3); font-size: var(--type-label); color: var(--muted); }
+.tl-legend span::before {
+  content: ""; display: inline-block; width: .55rem; height: .55rem; border-radius: 50%;
+  margin-right: .35rem; vertical-align: baseline;
+}
+.tl-legend .lg-plan::before { background: var(--surface); border: 2px solid var(--rule-strong); }
+.tl-legend .lg-actual::before { background: var(--within); }
+.tl-legend .lg-late::before { background: var(--breach); }
+.tl-legend .lg-awaiting::before { background: var(--surface); border: 2px dashed var(--review); }
+.tl-legend .lg-today::before { width: 2px; height: .7rem; border-radius: 1px; background: var(--reference); }
+
+@container (max-width: 34rem) {
+  .tl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tl-track { grid-column: 1 / -1; order: 3; margin: .3rem 0 .2rem; }
+  .tl-when { text-align: left; }
+}
+
+/* --- case record (§11.2 — full page and inspector share these) ------------------
+   The four concerns stay visibly separate: each .case-section is one concern,
+   titled, with its own surface. The inspector keeps the same sections at a
+   narrower measure; nothing is hidden at either depth. */
+
+.case-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.case-title { margin: .15rem 0 0; font-size: 1.05rem; font-weight: 650; }
+.case-sub { margin: .2rem 0 0; font-size: var(--type-small); color: var(--muted); }
+.case-sub a { color: var(--reference); text-decoration: none; }
+.case-sub a:hover { text-decoration: underline; }
+.case-flags { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
+
+.case-section {
+  margin-top: var(--space-4);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: var(--space-4);
+}
+.inspector-body .case-section { box-shadow: none; }
+.case-section-title {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .2rem var(--space-3);
+  font-size: var(--type-small); font-weight: 650; color: var(--ink);
+}
+.case-section-title > span { font-weight: 400; font-size: var(--type-label); color: var(--faint); }
+.case-narrative { margin: var(--space-2) 0 0; font-size: var(--type-body); line-height: 1.55; color: var(--ink-2); }
+.case-unknown { color: var(--review); font-weight: 600; }
+.case-fine { margin-top: var(--space-2); font-size: var(--type-label); line-height: 1.5; color: var(--faint); }
+.case-fine a { color: var(--reference); }
+
+.case-review { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--rule); display: grid; gap: var(--space-3); }
+.case-review-grid { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
+.case-review-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+@media (max-width: 560px) {
+  .case-review-grid { grid-template-columns: 1fr; }
+  .case-head { display: block; }
+  .case-flags { justify-content: flex-start; margin-top: .4rem; }
+}
+
+.case-history { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.case-history li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2);
+  align-items: baseline; padding: .4rem 0; border-top: 1px solid var(--rule);
+  font-size: var(--type-small);
+}
+.case-history li:first-child { border-top: 0; }
+.case-history-main { color: var(--ink-2); overflow-wrap: anywhere; }
+.case-history-reason { color: var(--muted); }
+.case-history-when { color: var(--faint); font-size: var(--type-label); white-space: nowrap; }
+.case-deeper { margin: var(--space-4) 0 0; font-size: var(--type-small); }
+.case-deeper a { color: var(--reference); font-weight: 600; text-decoration: none; }
+.case-deeper a:hover { text-decoration: underline; }
+
+/* --- coding assist (§7.3 — static review block + JS-live states) ----------------
+   One skin for both: the reference tint marks it as machine output awaiting a
+   human, in every context. The JS-only states (.assist-list, .assist-apply, …)
+   simply do not appear when coding-assist.js is not running. */
+
+.assist {
+  margin-top: .5rem; padding: .55rem .7rem;
+  background: var(--reference-2); border: 1px solid var(--reference-rule);
+  border-radius: var(--radius-sm);
+}
+.assist[hidden] { display: none; }
+.assist-static { background: var(--surface-sunk); border-color: var(--rule); }
+.assist-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem; margin: 0; font-size: var(--type-small); color: var(--ink-2); }
+.assist-line strong { color: var(--ink); }
+.assist-status { color: var(--muted); }
+.assist-basis { font-size: var(--type-label); color: var(--faint); }
+.assist-review { margin: .4rem 0 0; padding-top: .4rem; border-top: 1px dashed var(--rule); font-size: var(--type-small); color: var(--ink-2); }
+
+.assist-list { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .35rem; }
+.assist-item { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .6rem; }
+.assist-apply {
+  display: inline-flex; align-items: baseline; gap: .45rem;
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--radius-sm);
+  padding: .25rem .55rem;
+  transition: border-color var(--motion-instant) var(--ease-standard),
+              box-shadow var(--motion-instant) var(--ease-standard);
+}
+.assist-apply:hover, .assist-apply:focus-visible { border-color: var(--reference); }
+.assist-apply-static { cursor: default; background: transparent; border-color: transparent; padding-left: 0; padding-right: 0; }
+.assist-apply-static:hover { border-color: transparent; }
+.assist-chosen .assist-apply { border-color: var(--reference); box-shadow: 0 0 0 1px var(--reference); }
+.assist-note { margin: .45rem 0 0; font-size: var(--type-label); color: var(--faint); }
+.assist-none { margin: .3rem 0 0; font-size: var(--type-small); color: var(--muted); }
+.assist-error { color: var(--breach); }
+
+/* --- workspace split layout (signal detail §11.3, review package §11.4) --------
+   Evidence accumulates in the main column; context and clocks hold the side.
+   Below 60rem the side column folds under the main one — context is still
+   present, just not competing for the reading line. */
+
+.ws-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--space-4); align-items: start; }
+.ws-main, .ws-side { min-width: 0; }
+@media (max-width: 60rem) {
+  .ws-layout { grid-template-columns: minmax(0, 1fr); }
+  .ws-side > .mt-4:first-child { margin-top: 0; }
+}
+
+.sig-2x2 { max-width: 26rem; }
+.sig-2x2 .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- PRR track inside a queue row (signals queue) ------------------------------
+   The reference motif set with span markup (valid inside inline contexts):
+   force block geometry so the same .ref rules apply. */
+
+.q-row-ref { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; margin-top: .35rem; }
+span.ref { display: block; }
+.ref > span.ref-fill { display: block; }
+.q-row-ref .ref { flex: none; width: 8rem; }
+.q-row-ref-num { font-size: var(--type-small); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+
+/* --- trial context header side block ------------------------------------------ */
+
+.ctx-head-side { display: grid; justify-items: end; align-content: start; gap: .5rem; text-align: right; }
+.ctx-head-side .ctx-head-action { margin-top: 0; }
+@media (max-width: 640px) {
+  .ctx-head-side { justify-items: start; text-align: left; }
+}
+
+/* Only the first timeline row announces the indigo line as "today"; repeating
+   the label on every row is noise, not information. */
+.tl-today-quiet::after { content: none; }
+
+/* --- workflow stepper (review package §11.4) ------------------------------------
+   The real state machine, as it stands: done / current / upcoming / bypassed.
+   "Current" wears the reference indigo — where the record stands is exactly
+   the token's one reserved meaning. A bypassed step is shown, not omitted:
+   Path A (resolved at officer review) skipping Leadership is a fact of the
+   state machine, and hiding it would redraw that machine. */
+
+.steps {
+  list-style: none; margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4);
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  container-type: inline-size;
+}
+.step { display: grid; grid-template-rows: auto auto; gap: .3rem; min-width: 0; }
+.step-head { display: flex; align-items: center; gap: .4rem; }
+.step-head::after { content: ""; height: 2px; flex: 1; background: var(--rule); border-radius: 2px; }
+.step:last-child .step-head::after { content: none; }
+.step-dot {
+  flex: none; width: .7rem; height: .7rem; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--rule-strong);
+}
+.step-body { display: grid; gap: .1rem; min-width: 0; }
+.step-name { font-size: var(--type-small); font-weight: 650; color: var(--muted); }
+.step-meta { font-size: var(--type-label); line-height: 1.4; color: var(--faint); overflow-wrap: anywhere; }
+.step-meta-bad { color: var(--breach); font-weight: 600; }
+
+.step-done .step-dot { background: var(--within); border-color: var(--within); }
+.step-done .step-head::after { background: var(--within-rule); }
+.step-done .step-name { color: var(--ink-2); }
+.step-current .step-dot {
+  background: var(--reference); border-color: var(--reference);
+  box-shadow: 0 0 0 3px var(--reference-2);
+}
+.step-current .step-name { color: var(--ink); }
+.step-bypassed .step-dot { background: transparent; border-style: dashed; border-color: var(--faint); }
+.step-bypassed .step-name, .step-bypassed .step-meta { color: var(--faint); }
+
+@container (max-width: 34rem) {
+  .steps { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  .step { grid-template-rows: none; grid-template-columns: auto minmax(0, 1fr); gap: .6rem; align-items: stretch; }
+  .step-head { flex-direction: column; gap: .25rem; align-items: center; padding-top: .2rem; }
+  .step-head::after { width: 2px; height: auto; min-height: .6rem; }
+  .step:last-child .step-head::after { content: none; }
+}
+
+/* --- misc --------------------------------------------------------------------- */
+
+/* The inspector and the palette never fight: the palette stays on top. */
+@media print {
+  .inspector-root, .q-toolbar, .q-pages, .subnav, .steps { display: none !important; }
+}

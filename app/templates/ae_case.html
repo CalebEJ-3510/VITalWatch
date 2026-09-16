@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_head %}
+{% block title %}{{ event.id }} — Adverse-event case — {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+{% call page_head(event.id ~ ' — adverse-event case',
+        'Clinical fact, reporting obligation, workflow task and audit history — kept separate, in one record.',
+        back='/ae', back_label='Adverse-event queue') %}
+{% endcall %}
+
+{% include "_ae_case.html" %}
+
+{% endblock %}

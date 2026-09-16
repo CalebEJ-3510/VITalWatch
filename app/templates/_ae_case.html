@@ -1,0 +1,176 @@
+{#- The AE case record (prompt.md §11.2), shared by the full page
+   (ae_case.html) and the queue's side inspector (§7.2) — one data assembly,
+   two depths. The four concerns of §2 are kept visibly separate and in order:
+   clinical fact, reporting obligation, workflow task, audit history. -#}
+{% from "_macros.html" import badge, severity_badge %}
+{% from "_components.html" import deadline_clock %}
+
+{% set e = event %}
+{% set left = e.hours_left %}
+
+<article class="case">
+  <header class="case-head">
+    <div>
+      <span class="label">Adverse-event case</span>
+      <h2 class="case-title code">{{ e.id }}</h2>
+      <p class="case-sub">
+        participant <span class="code">{{ e.participant_code }}</span> ·
+        {% if trial %}<a href="/trial/{{ trial.id }}">{{ trial.id }} — {{ trial.title }}</a>{% else %}{{ e.trial_id }}{% endif %}
+      </p>
+    </div>
+    <div class="case-flags">
+      {% if e.serious %}{{ badge('Serious', 'bad') }}{% else %}{{ badge('Non-serious', 'neutral') }}{% endif %}
+      {{ severity_badge(e.severity) }}
+    </div>
+  </header>
+
+  {% if filed %}
+  <div class="state state-success" role="status">
+    <p class="state-title">Event filed and written to the audit trail.</p>
+    <p class="state-body">
+      Created <span class="code">{{ e.id }}</span> with an AI coding suggestion attached.
+      {% if e.serious %}The 24-hour reporting clock started at intake ({{ e.reported_at | dt }}).{% else %}No statutory clock — non-serious events carry no 24-hour obligation.{% endif %}
+      What is incomplete: coding is <strong>not final</strong> — a Safety Officer owns the
+      confirm/correct/uncoded decision below, and that decision is what the record will show.
+    </p>
+  </div>
+  {% endif %}
+
+  {# ── 1 · Clinical / scientific fact ──────────────────────────────────── #}
+  <section class="case-section">
+    <h3 class="case-section-title">Clinical fact <span>reported, never inferred</span></h3>
+    <p class="case-narrative">{{ e.narrative }}</p>
+    <dl class="fact-grid mt-3">
+      <div><dt>Onset date</dt><dd>{{ e.onset_date | d }}</dd></div>
+      <div><dt>Reported at</dt><dd>{{ e.reported_at | dt }}</dd></div>
+      <div><dt>Severity</dt><dd>{{ e.severity | capitalize }}</dd></div>
+      <div><dt>Causality (WHO-UMC)</dt><dd>{{ e.causality | label }}</dd></div>
+      <div><dt>Outcome</dt><dd>{{ e.outcome | label }}</dd></div>
+      <div><dt>Suspect drug</dt><dd>{{ e.suspect_drug or '—' }}</dd></div>
+    </dl>
+    <dl class="fact-grid mt-3">
+      <div>
+        <dt>Coded term</dt>
+        <dd>
+          {% if e.coded_term %}
+            {{ e.coded_term }} <span class="code">{{ e.coded_code }}</span>
+          {% else %}
+            <span class="case-unknown">Uncoded — awaiting review</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div>
+        <dt>Coding source</dt>
+        <dd>{{ e.coding_source | label }} — curated vocabulary (app/terms.csv), not MedDRA</dd>
+      </div>
+      {% if e.coding_confidence is not none %}
+      <div><dt>Suggestion confidence</dt><dd>{{ e.coding_confidence }} — a vocabulary-match score, not clinical confidence</dd></div>
+      {% endif %}
+    </dl>
+  </section>
+
+  {# ── 2 · Reporting obligation ────────────────────────────────────────── #}
+  <section class="case-section">
+    <h3 class="case-section-title">Reporting obligation <span>NDCT Rules 2019, Third Schedule — demonstration clocks</span></h3>
+    {% if e.serious %}
+      {% set tone = 'bad' if e.timeline_status == 'breached' else 'warn' if e.timeline_status == 'due_soon' else 'good' %}
+      {% set status = ('Deadline unknown — review required' if e.clock_unknown
+                       else 'Breached ' ~ (-left)|round(0)|int ~ 'h ago' if e.timeline_status == 'breached'
+                       else left|round(1) ~ 'h remaining' if left is not none
+                       else 'On track') %}
+      {{ deadline_clock(e.reported_at | dt, e.deadline_24h | dt, settings.clinical_timezone, as_of | dt, tone, status) }}
+      <p class="case-fine">
+        24-hour EC / licensing-authority notification by {{ e.deadline_24h | dt }};
+        14-day narrative by {{ e.deadline_14d | d }}.
+        Clock started at data entry — this view does not prove an external authority
+        received a submission; no external submission timestamp is recorded.
+      </p>
+    {% else %}
+      <p class="case-fine">No statutory reporting clock — non-serious events carry no 24-hour obligation in this demonstration.</p>
+    {% endif %}
+  </section>
+
+  {# ── 3 · Workflow task ───────────────────────────────────────────────── #}
+  <section class="case-section">
+    <h3 class="case-section-title">Coding review <span>the AI suggests; a person disposes</span></h3>
+
+    {% if coding %}
+    <div class="assist assist-static">
+      <p class="assist-line">
+        <span class="label">AI suggestion</span>
+        {% if coding.suggested_term %}
+          <strong>{{ coding.suggested_term }}</strong> <span class="code">{{ coding.suggested_code }}</span>
+          <span class="assist-basis">engine {{ coding.engine_version }} · confidence {{ coding.suggestion_confidence }}</span>
+        {% else %}
+          <strong>No reliable suggestion</strong>
+          <span class="assist-basis">nothing in the curated vocabulary cleared the confidence floor — an honest gap, not a guess</span>
+        {% endif %}
+      </p>
+      {% if coding.decision and coding.decision != 'uncoded' or coding.reviewed_at %}
+      <p class="assist-review">
+        Reviewed by <strong>{{ coding.reviewer_id }}</strong> — {{ coding.decision | label }}
+        {% if coding.final_term %} → {{ coding.final_term }} <span class="code">{{ coding.final_code }}</span>{% endif %}
+        · {{ coding.reviewed_at | dt }}
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if can_review %}
+    <form method="post" action="/portal/safety_officer/ae/{{ e.id }}/code" class="case-review">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="next" value="/ae/{{ e.id }}">
+      <div class="case-review-grid">
+        <label class="block text-sm">
+          <span class="label">Final term (for a correction)</span>
+          <input name="final_term" class="field mt-1" value="{{ coding.suggested_term or '' if coding else '' }}"
+                 data-coding-final-term autocomplete="off">
+        </label>
+        <label class="block text-sm">
+          <span class="label">Final code</span>
+          <input name="final_code" class="field mt-1" value="{{ coding.suggested_code or '' if coding else '' }}"
+                 data-coding-final-code autocomplete="off">
+        </label>
+      </div>
+      {# Live assist against this case's own narrative (§7.3) — request body
+         only, debounced by the reader's pause, stale responses discarded. #}
+      <input type="hidden" data-coding-source value="{{ e.narrative }}">
+      <div class="assist" data-coding-assist data-coding-autoload hidden aria-live="polite"></div>
+      <div class="case-review-actions">
+        <button type="submit" name="decision" value="confirmed" class="btn btn-primary">Confirm suggestion</button>
+        <button type="submit" name="decision" value="corrected" class="btn btn-secondary">Confirm as corrected</button>
+        <button type="submit" name="decision" value="uncoded" class="btn btn-quiet">Leave uncoded</button>
+      </div>
+      <p class="case-fine">A confidence score is not a probability of diagnosis — the match
+      basis (exact / phrase / fuzzy) is shown with each suggestion, and your decision is audited.</p>
+    </form>
+    {% elif not e.coded_term %}
+      <p class="case-fine">Coding review belongs to the Safety Officer. Your role sees the record read-only.</p>
+    {% endif %}
+  </section>
+
+  {# ── 4 · Audit history ───────────────────────────────────────────────── #}
+  <section class="case-section">
+    <h3 class="case-section-title">Audit history <span>what changed, who, when — append-only</span></h3>
+    {% if history %}
+    <ol class="case-history">
+      {% for h in history %}
+      <li>
+        <span class="code">#{{ h.seq }}</span>
+        <span class="case-history-main">
+          <strong>{{ h.actor }}</strong> ({{ h.role | label }}) · {{ h.action }} · {{ h.resource_type | label }}
+          {% if h.reason %}<span class="case-history-reason">— {{ h.reason }}</span>{% endif %}
+        </span>
+        <span class="case-history-when code">{{ h.timestamp_utc | dt }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <p class="case-fine">No audit events reference this record — which should be impossible for a filed event; treat as a finding.</p>
+    {% endif %}
+  </section>
+
+  {% if fragment %}
+  <p class="case-deeper"><a href="/ae/{{ e.id }}">Open the full case page →</a></p>
+  {% endif %}
+</article>

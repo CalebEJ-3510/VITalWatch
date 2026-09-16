@@ -1,0 +1,11 @@
+/* VITalWatch — Tailwind entry point for the local build (Phase 1).
+ *
+ * Preflight stays on: the templates rely on the same reset the Play CDN
+ * shipped, and turning it off here would re-style every page at once.
+ * Product design tokens are NOT in this file — tokens.css is the single
+ * source of truth; this file exists only to freeze the utility-class set
+ * the templates already use, so no CDN request ever renders the product.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

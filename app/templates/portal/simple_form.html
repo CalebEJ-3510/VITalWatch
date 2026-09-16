@@ -1,0 +1,9 @@
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head %}
+{% set portal_id='volunteer' %}{% set portal_label='Volunteer portal' %}{% set portal_crumbs=[(title,None)] %}
+{% block portal_main %}
+{% call page_head(title, subtitle) %}{% endcall %}
+<form method="post" action="{{ action }}" class="panel p-5 space-y-4"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% for name,label,kind,options in fields %}<label class="block text-sm"><span class="label">{{ label }}</span>{% if kind=='select' %}<select name="{{ name }}" class="field mt-1" required>{% for option in options %}<option value="{{ option.id }}">{{ option.id }} — {{ option.title }}</option>{% endfor %}</select>{% elif kind=='textarea' %}<textarea name="{{ name }}" rows="8" class="field mt-1" required>{}</textarea>{% else %}<input name="{{ name }}" class="field mt-1" required>{% endif %}</label>{% endfor %}
+<button class="btn btn-primary">Submit for review</button></form>
+{% endblock %}

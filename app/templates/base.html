@@ -1,0 +1,190 @@
+{% from "_macros.html" import nav_link %}
+{% from "_components.html" import notice_synthetic, freshness %}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="googlebot" content="noindex, nofollow, noarchive">
+  {# Published for fetch() calls to request-body API routes; the CSRF cookie itself
+    stays HttpOnly. See app/security.py::verify_csrf_header. #}
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
+  {# Self-hosted assets only — no CDN request renders this product (prompt.md §6.1.1):
+     the self-hosted type system with metric-matched fallbacks, the design tokens,
+     the locally compiled Tailwind utility set (npm run build:css), then product
+     styles. Only the body face's regular weight is preloaded — it renders above
+     the fold on every page; the display face is optional and never preloaded. #}
+  <link rel="preload" href="/static/fonts/manrope-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/vendor/tailwind.css">
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  {# Phase 4 (§10): queue rows, the worklist+inspector, the trial workspace and
+     the milestone timeline. Loaded after app.css; tokens only, no new hues. #}
+  <link rel="stylesheet" href="/static/queue.css">
+</head>
+<body class="min-h-full antialiased">
+
+{#
+  Authenticated shell (Phase 3, prompt.md §9.2). Persistent elements and where they live:
+  product mark + Demonstration badge (rail), current workspace name (topbar), global
+  search / command palette (topbar trigger + #palette dialog, palette.js), data
+  freshness as-of (topbar), help access (topbar → /docs), user name / actual role /
+  scope / logout (rail + mobile drawer), mobile drawer (topbar, native <details> so
+  it works without JS). Exactly one dashboard per role exists today (§5), so there
+  is no lens/workspace switcher anywhere in this shell — nav is generated from the
+  signed-in role and reflects the server-side gate (require()/PERMISSIONS_BY_ROLE);
+  it never substitutes for it.
+#}
+
+{% set nav_content %}
+  <p class="nav-section">CTMS Portal</p>
+  {% if current_user %}
+    {{ nav_link('/portal/' + current_user.role.value, 'My dashboard', request) }}
+    {% if current_user.role.value in ['investigator', 'safety_officer', 'company', 'leadership'] %}
+      {{ nav_link('/escalations', 'Escalations', request) }}
+      {{ nav_link('/alerts', 'Alerts', request) }}
+    {% endif %}
+    {% if current_user.role.value in ['safety_officer', 'investigator'] %}
+      {{ nav_link('/ae', 'Adverse events', request) }}
+    {% endif %}
+    {% if current_user.role.value == 'safety_officer' %}
+      {{ nav_link('/signals', 'Safety signals', request) }}
+    {% endif %}
+    {% if current_user.role.value == 'leadership' %}
+      {{ nav_link('/search', 'Global search', request) }}
+      {{ nav_link('/audit', 'Audit trail', request) }}
+    {% endif %}
+  {% endif %}
+  <p class="nav-section">System</p>
+  {{ nav_link('/docs', 'API', request) }}
+{% endset %}
+
+<div class="app-shell flex min-h-screen">
+
+  <aside class="sidebar">
+    <a href="/" class="flex items-center gap-2.5 px-4 py-4">
+      <img src="/static/mark.svg" alt="" width="32" height="32" class="h-9 w-9 shrink-0">
+      <span class="leading-tight">
+        <span class="block text-[15px] font-semibold tracking-tight text-white">{{ settings.app_name }}</span>
+        <span class="mt-0.5 block text-[10.5px] font-semibold uppercase tracking-[.1em]" style="color:var(--institution-hi)">Clinical trials · PV</span>
+      </span>
+    </a>
+    <p class="px-4"><span class="env-badge">Demonstration</span></p>
+
+    <nav class="mt-2 flex-1 px-2" aria-label="Primary">
+      {{ nav_content }}
+    </nav>
+
+    <div class="border-t border-white/10 px-4 py-3">
+      {% if current_user %}
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <span class="min-w-0">
+          <span class="block truncate text-[12px] font-medium text-white">{{ current_user.display_name }}</span>
+          <span class="block text-[10.5px] uppercase tracking-[.06em]" style="color:var(--institution-hi)">{{ current_user.role.value | label }}</span>
+        </span>
+        <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="rounded border border-white/15 px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10">Log out</button>
+        </form>
+      </div>
+      {% endif %}
+      <div class="flex items-center gap-2 text-[11px]" style="color:#cbd5e1">
+        <span class="h-1.5 w-1.5 rounded-full" style="background:var(--review-hi);box-shadow:0 0 0 3px rgba(251,191,36,.2)"></span>
+        Synthetic data only
+      </div>
+      <p class="mt-1 text-[10.5px] leading-relaxed" style="color:var(--institution-hi)">
+        {{ settings.org_name }}
+      </p>
+    </div>
+  </aside>
+
+  <div class="flex min-w-0 flex-1 flex-col">
+
+    <header class="topbar">
+      {# Mobile navigation: a real drawer (native <details> — works with JS disabled),
+         never squeezed horizontal links (§8.3's rule applies to the product too). #}
+      <details class="nav-drawer" id="nav-drawer">
+        <summary aria-label="Open navigation menu">
+          <span class="nav-drawer-icon" aria-hidden="true"></span>
+          <span class="sr-only">Menu</span>
+        </summary>
+        <div class="nav-drawer-panel">
+          <nav aria-label="Mobile">
+            {{ nav_content }}
+          </nav>
+          {% if current_user %}
+          <div class="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+            <span class="min-w-0">
+              <span class="block truncate text-[12px] font-medium text-white">{{ current_user.display_name }}</span>
+              <span class="block text-[10.5px] uppercase tracking-[.06em]" style="color:var(--institution-hi)">{{ current_user.role.value | label }}</span>
+            </span>
+            <form method="post" action="/logout">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="rounded border border-white/15 px-2 py-1 text-[11px] font-medium text-white/80 hover:bg-white/10">Log out</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+
+      <span class="topbar-workspace">{{ workspace_name }}</span>
+
+      {# Command palette trigger (§7.4). Hidden without JS — the rail remains the
+         complete navigation without it, so nothing is lost; palette.js reveals it. #}
+      <button type="button" class="topbar-search" data-palette-open hidden>
+        <span class="topbar-search-label">Search trials, cases, escalations…</span>
+        <kbd class="topbar-kbd" data-palette-hint>Ctrl K</kbd>
+      </button>
+
+      <span class="topbar-freshness">{{ freshness(as_of | dt, "Data as of") }}</span>
+      <a href="/docs" class="topbar-help">Help &amp; API</a>
+    </header>
+
+    <main class="flex-1 px-8 py-6" id="main">
+      {# One notice component, one copy source (prompt.md §13.1) — the banner and the
+        footer can no longer drift into telling two different stories. #}
+      {{ notice_synthetic("banner") }}
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t bg-white px-8 py-3" style="border-color:var(--rule)">
+      <div class="flex flex-wrap gap-x-6 gap-y-1 text-[11px]" style="color:var(--muted)">
+        {{ notice_synthetic("footer") }}
+      </div>
+    </footer>
+  </div>
+</div>
+
+{# Command palette (§7.4). Server-side permission-filtered via /api/search; full
+   keyboard operability, aria-live result counts, distinct idle/loading/empty/error
+   states. Progressive enhancement only — never the only way to navigate. #}
+<div class="palette" id="palette" hidden>
+  <div class="palette-backdrop" data-palette-close></div>
+  <div class="palette-panel" role="dialog" aria-modal="true" aria-label="Global search">
+    <div class="palette-input-row">
+      <input type="search" id="palette-input" autocomplete="off" spellcheck="false"
+             placeholder="Trial ID, case ID, participant code, escalation ID, audit sequence…"
+             aria-label="Search trials, participants, cases, escalations and audit sequence">
+    </div>
+    <p class="palette-status" id="palette-status" role="status" aria-live="polite">
+      Type at least 2 characters to search.
+    </p>
+    <div class="palette-results" id="palette-results" role="listbox" aria-label="Search results"></div>
+    <p class="palette-footer">↑ ↓ to move · Enter to open · Esc to close ·
+      results are limited to records your role may read</p>
+  </div>
+</div>
+<script src="/static/palette.js" defer></script>
+{# Phase 4/5 progressive enhancement. Both modules are self-gating — each
+   returns immediately when its mount point is absent, so pages without a
+   queue or a coding field pay nothing but a parse. With JavaScript disabled,
+   every row's primary link still opens the full record page. #}
+<script src="/static/inspector.js" defer></script>
+<script src="/static/coding-assist.js" defer></script>
+
+</body>
+</html>

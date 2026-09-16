@@ -1,0 +1,160 @@
+{#-
+  portal/safety_dashboard.html — the Safety Officer dashboard (prompt.md §9.3).
+
+  First-screen question (§5.1): "Which event or reporting obligation requires
+  attention next?" The composition answers it in clock order, not intake order:
+
+    1. the statutory-clock strip (breached / due soon counts, derived live);
+    2. the AE coding queue — worst clock first (§9.3: a serious event hours
+       from its 24-hour deadline outranks an uncoded mild event), each row
+       carrying the AI coding suggestion from ae_codes with its engine version
+       and confidence, and the officer's confirm / correct / leave-uncoded
+       control — the suggestion never codes the record by itself;
+    3. PRR signals (triage order, criterion visible) with the escalate path;
+    4. safety-concern escalations in the governance loop.
+
+  Context contract (supplied by app/main.py::safety_dashboard):
+
+    uncoded_events   list  AE rows (coded_term IS NULL) as dicts via
+                           pv.with_live_status + LEFT JOIN ae_codes
+                           (suggested_term, suggested_code,
+                           suggestion_confidence, suggestion_engine),
+                           sorted worst-clock-first by the route
+    coded_events     list  recently coded AE rows with live status
+    clocks           dict  pv.clock_counts — breached / due_soon / on_track /
+                           not_applicable / unknown live counts
+    signals          list  every signals.detect row (PRR screen results)
+    flagged_signals  list  the subset at or above the screening threshold
+    escalations      list  safety_concern escalations (any status)
+    terms            list  the curated coding vocabulary (app/terms.csv)
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head, badge %}
+{% from "portal/_partials.html" import p_metric, p_status_badge, p_clock_badge, p_empty, p_panel_head, p_suggestion %}
+{% set portal_id='safety' %}{% set portal_label='Safety Officer portal' %}{% set portal_crumbs=[('Dashboard',None)] %}
+{% set open_escalations = escalations | selectattr('status', 'equalto', 'open') | list %}
+{% set review_escalations = escalations | selectattr('status', 'equalto', 'company_responded') | list %}
+{% set portal_nav_sections=[('Safety review',[('/portal/safety_officer','Dashboard',None),('/ae','Adverse events',uncoded_events|length or None),('/signals','PRR analysis',flagged_signals|length or None),('/escalations','Safety escalations',open_escalations|length or None)]),('Queues on this page',[('#coding','Coding queue',uncoded_events|length or None),('#signals','Signals',flagged_signals|length or None),('#escalations','Escalations',None)])] %}
+{% block portal_main %}
+{% call page_head('Safety Officer dashboard','Which event or reporting obligation requires your attention next — worst statutory clock first, then uncoded work, signals and escalations.') %}
+  <a class="btn btn-secondary" href="/escalations/new">Raise safety concern →</a>
+{% endcall %}
+
+<div class="grid gap-4 sm:grid-cols-4">
+  {{ p_metric('Breached clocks', clocks.breached + clocks.unknown,
+              'serious AEs past their 24-hour deadline' ~ (' · ' ~ clocks.unknown ~ ' unreadable deadline' if clocks.unknown else ''),
+              tone='bad' if (clocks.breached + clocks.unknown) else 'good', href='#coding',
+              definition='Serious adverse events whose live-derived 24-hour statutory clock has arrived or passed; unreadable deadlines count as breached, never as safe.') }}
+  {{ p_metric('Due soon', clocks.due_soon,
+              'inside the warning window', tone='warn' if clocks.due_soon else 'good', href='#coding',
+              definition='Serious events inside the configured due-soon window before the 24-hour deadline.') }}
+  {{ p_metric('Awaiting coding review', uncoded_events|length,
+              'AI suggestion is advisory — you decide', tone='warn' if uncoded_events else 'good', href='#coding',
+              definition='Adverse events whose coded_term is not yet set; each carries the AI suggestion from ae_codes for your confirm / correct / leave-uncoded decision.') }}
+  {{ p_metric('Open safety escalations', open_escalations|length,
+              review_escalations|length ~ ' with a Company response to review', tone='warn' if open_escalations else 'neutral', href='#escalations',
+              definition='safety_concern escalations with status open; those with status company_responded await your resolve-or-escalate review.') }}
+</div>
+
+{# ---- AE coding queue, worst clock first ------------------------------------------ #}
+<section class="panel mt-5 overflow-hidden" id="coding">
+  {{ p_panel_head('AE coding review', 'worst statutory clock first — suggestions are not final safety decisions') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>AE</th><th>Trial</th><th>Statutory clock</th><th>Narrative</th><th>Suggested coding</th><th>Safety Officer decision</th></tr></thead>
+    <tbody>
+      {% for e in uncoded_events %}
+      <tr class="{{ 'row-breach' if e.timeline_status == 'breached' else '' }}">
+        <td class="code">{{ e.id[:8] }}</td>
+        <td class="code">{{ e.trial_id }}</td>
+        <td>
+          {{ p_clock_badge(e.timeline_status) }}
+          {% if e.hours_left is not none and e.serious %}
+          <div class="mt-0.5 text-[11px] tabular-nums {{ 'text-[color:var(--breach)]' if e.hours_left < 0 else 'text-slate-400' }}">
+            {{ ('overdue ' ~ ((-e.hours_left) | round(1)) ~ 'h') if e.hours_left < 0 else (e.hours_left | round(1) ~ 'h left') }}
+          </div>
+          {% endif %}
+        </td>
+        <td class="max-w-xs"><span class="text-[13px] text-slate-600">{{ e.narrative[:110] }}{{ '…' if e.narrative | length > 110 else '' }}</span></td>
+        <td class="text-xs">
+          {% if e.suggested_term %}
+            {{ p_suggestion(e.suggested_term) }}
+            <div class="mt-0.5 text-[11px] text-slate-400">engine {{ e.suggestion_engine }} · confidence {{ e.suggestion_confidence }}</div>
+          {% else %}
+            <span class="text-slate-400">No suggestion</span>
+          {% endif %}
+        </td>
+        <td>
+          <form class="flex flex-wrap gap-2" method="post" action="/portal/safety_officer/ae/{{ e.id }}/code">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <select class="field" name="decision" aria-label="Coding decision">
+              <option value="confirmed">Confirm suggestion</option>
+              <option value="corrected">Correct</option>
+              <option value="uncoded">Leave uncoded</option>
+            </select>
+            <input class="field" name="final_term" value="{{ e.suggested_term or '' }}" placeholder="Final term">
+            <input class="field" name="final_code" value="{{ e.suggested_code or '' }}" placeholder="Final code">
+            <button class="btn btn-primary">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'No events awaiting coding review — ' ~ coded_events|length ~ ' recently coded.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{# ---- PRR signals ------------------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="signals">
+  <div class="panel-head">
+    <span class="panel-title">PRR signals<span class="ml-2 font-normal text-slate-400">PRR ≥ 2.0 with ≥ 3 cases — a triage order, never a verdict</span></span>
+    <a class="text-xs text-[color:var(--reference)]" href="/signals">Open full PRR analysis →</a>
+  </div>
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Term</th><th>Trial</th><th>Event reports</th><th>Reference reports</th><th>PRR</th><th>Screen</th><th>Next action</th></tr></thead>
+    <tbody>
+      {% for s in signals %}
+      <tr>
+        <td>{{ s.coded_term }}</td>
+        <td class="code">{{ s.trial_id }}</td>
+        <td class="num">{{ s.cases }}</td>
+        <td class="num">{{ s.other_cases }}</td>
+        <td class="num">{{ '%.2f' | format(s.prr) if s.prr is not none else 'Not seen elsewhere' }}</td>
+        <td>{{ badge('Review' if s.flagged else 'Monitor', 'warn' if s.flagged else 'neutral') }}</td>
+        <td>
+          {% if s.flagged %}
+          <a class="text-[color:var(--reference)] hover:underline" href="/escalations/new">Raise safety concern →</a>
+          {% else %}<span class="text-xs text-slate-400">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{# ---- safety-concern escalations ------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="escalations">
+  {{ p_panel_head('Safety-concern escalations', 'the governance loop — raise → Company response → your review → leadership if unresolved') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Escalation</th><th>Trial</th><th>Severity</th><th>Status</th><th>Raised</th><th>Package</th></tr></thead>
+    <tbody>
+      {% for e in escalations %}
+      <tr class="{{ 'row-breach' if e.status == 'company_responded' else '' }}">
+        <td>
+          <span class="code">{{ e.id[:8] }}</span>
+          <div class="max-w-xs truncate text-xs text-slate-500">{{ e.reason[:90] }}{{ '…' if e.reason | length > 90 else '' }}</div>
+        </td>
+        <td class="code">{{ e.trial_id }}</td>
+        <td>{{ badge(e.severity | label, {'critical': 'bad', 'high': 'bad', 'medium': 'warn'}.get(e.severity, 'neutral')) }}</td>
+        <td>{{ p_status_badge(e.status) }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+        <td><a class="text-[color:var(--reference)] hover:underline" href="/escalations/{{ e.id }}">
+          {{ 'Review response →' if e.status == 'company_responded' else 'Open →' }}</a></td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'No safety-concern escalations raised.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

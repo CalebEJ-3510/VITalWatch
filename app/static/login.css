@@ -1,0 +1,317 @@
+/* VITalWatch — sign-in (Phase 6, prompt.md §16).
+   ---------------------------------------------------------------------------
+   The gate belongs to the public shell family: it shares the landing page's
+   Direction B register (paper ground, institution dark panel, display face)
+   and the shared token system — every colour, radius, shadow and duration
+   below is a tokens.css variable. Nothing here restates a token value.
+
+   Motion: entrance choreography is load-time CSS (works with JavaScript
+   disabled) and every animated rule lives inside
+   `@media (prefers-reduced-motion: no-preference)` — reduced motion gets the
+   complete page, instantly (§6.1.3, §13.3). */
+
+:root {
+  --paper: #f6f4ed;
+  --paper-sunk: #eeebe1;
+  --paper-rule: #dcd7c8;
+  --paper-rule-strong: #c8c2b0;
+}
+
+body.auth {
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* --- geometry ----------------------------------------------------------------
+   Two columns on wide screens: the thesis (5) and the work (6). Below 900px
+   the editorial panel steps aside and the card carries a compact brand band —
+   the gate's job on a phone is to be a gate, not a brochure. */
+.auth-grid {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+}
+
+/* --- editorial panel --------------------------------------------------------- */
+.auth-side {
+  background: var(--institution);
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  padding: 3rem 3.25rem;
+}
+.auth-side-inner { max-width: 30rem; margin: 0 auto; width: 100%; }
+
+.auth-brand { display: inline-flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+.auth-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+.auth-brand-compact { display: none; }
+
+.auth-side-kicker { margin: 2.75rem 0 1.1rem; color: #94a3b8; }
+.auth-side-kicker strong { color: #cbd5e1; }
+
+.auth-side-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 3.4vw, 3.1rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  color: #f8fafc;
+}
+.auth-line { display: block; overflow: hidden; }
+.auth-line > span { display: inline-block; }
+
+.auth-side-sub {
+  margin-top: 1.35rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #94a3b8;
+  max-width: 26rem;
+}
+
+/* The reference-line motif, animated once on load: the page's graphic argument
+   is the same mark the product measures everything against. */
+.auth-refmotif { margin-top: 2.75rem; max-width: 24rem; }
+.auth-refmotif .ref { height: 8px; background: var(--institution-2); }
+.auth-refmotif .ref-fill { height: 8px; width: 81%; }
+.auth-refmotif .ref-mark { top: -5px; height: 18px; width: 4px; background: #f8fafc; box-shadow: 0 0 0 1.5px var(--institution); }
+.auth-refmotif .ref-mark::after { box-shadow: 0 0 0 1.5px var(--institution); }
+.auth-refmotif .ref-legend { color: #64748b; }
+.auth-refmotif .ref-legend .at { color: var(--institution-hi); }
+
+.auth-side-meta {
+  margin-top: 2.5rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--institution-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.4rem;
+}
+.auth-side-meta .l-meta { color: #64748b; }
+.auth-side-meta .l-meta strong { color: #94a3b8; }
+
+/* --- form panel --------------------------------------------------------------- */
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+}
+.auth-card { width: 100%; max-width: 27.5rem; }
+
+.auth-card-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.auth-card-head p {
+  margin: 0.55rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.auth-card-head { margin-bottom: 1.4rem; }
+.auth-card-head .auth-brand-compact { margin-bottom: 1.6rem; }
+
+.auth-error {
+  margin-bottom: 1.1rem;
+  border: 1px solid var(--breach-rule);
+  border-left: 3px solid var(--breach);
+  border-radius: var(--radius-sm);
+  background: var(--breach-bg);
+  color: var(--breach);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.auth-error strong { color: var(--breach); }
+
+.auth-form { display: grid; gap: 0.9rem; }
+.auth-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  margin-bottom: 0.35rem;
+}
+.auth-field input {
+  width: 100%;
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color var(--motion-instant) var(--ease-standard),
+              box-shadow var(--motion-instant) var(--ease-standard);
+}
+.auth-field input:focus {
+  border-color: var(--reference);
+  box-shadow: 0 0 0 3px var(--reference-2);
+}
+.auth-submit {
+  margin-top: 0.25rem;
+  justify-content: center;
+  padding: 0.7rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* --- demo quick-fill chips ------------------------------------------------------
+   One row per role: the role's name, its credentials in mono (readable and
+   typeable with JavaScript disabled), and a one-line "what you will see".
+   The filled state is text-labelled ("filled ✓") — colour is never the only
+   carrier (§6.3). */
+.auth-demo { margin-top: 1.9rem; }
+.auth-demo-head h3 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+.auth-demo-head p {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.auth-chips { margin-top: 0.85rem !important; display: grid; gap: 0.5rem; }
+.auth-chip {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--paper-rule);
+  border-left: 3px solid var(--paper-rule-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  box-shadow: var(--shadow);
+  transition: border-color var(--motion-instant) var(--ease-standard),
+              box-shadow var(--motion-quick) var(--ease-standard),
+              transform var(--motion-quick) var(--ease-standard),
+              background-color var(--motion-instant) var(--ease-standard);
+}
+.auth-chip:hover {
+  border-color: var(--muted);
+  border-left-color: var(--ink-2);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-1px);
+}
+.auth-chip:active { transform: translateY(0); }
+.auth-chip-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.auth-chip-role { font-size: 0.8125rem; font-weight: 650; color: var(--ink); }
+.auth-chip-go {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--reference);
+  white-space: nowrap;
+}
+.auth-chip-cred {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.auth-chip-what {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+/* The filled chip: labelled in text, tinted with the reference stop — the
+   account whose credentials currently sit in the form. */
+.auth-chip-on {
+  border-color: var(--reference-rule);
+  border-left-color: var(--reference);
+  background: var(--reference-2);
+}
+.auth-chip-on .auth-chip-go { font-size: 0; color: var(--within); font-weight: 700; }
+.auth-chip-on .auth-chip-go::after {
+  content: "filled ✓";
+  font-size: 0.625rem;
+}
+
+.auth-demo-note {
+  margin-top: 0.9rem;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+.auth-foot {
+  margin-top: 1.75rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--paper-rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--faint);
+}
+
+/* --- entrance choreography -------------------------------------------------------
+   Load-time CSS only — no JavaScript involved, so the gate animates even with
+   scripting disabled, and every rule is fenced behind no-preference so reduced
+   motion renders the final state instantly (§6.1.3). */
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(0.65rem); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes auth-line-up {
+  from { transform: translateY(110%); }
+  to   { transform: none; }
+}
+@keyframes auth-ref-grow {
+  from { width: 0; }
+  to   { width: 81%; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-side-title .auth-line > span {
+    animation: auth-line-up 0.7s var(--ease-standard) both;
+  }
+  .auth-side-title .auth-line:nth-child(2) > span { animation-delay: 0.12s; }
+  .auth-side-title .auth-line:nth-child(3) > span { animation-delay: 0.24s; }
+  .auth-side-sub { animation: auth-rise 0.55s var(--ease-standard) 0.34s both; }
+  .auth-refmotif { animation: auth-rise 0.55s var(--ease-standard) 0.44s both; }
+  .auth-refmotif .ref-fill { animation: auth-ref-grow 0.9s var(--ease-standard) 0.6s both; }
+  .auth-side-meta { animation: auth-rise 0.55s var(--ease-standard) 0.52s both; }
+
+  .auth-card-head { animation: auth-rise 0.5s var(--ease-standard) 0.08s both; }
+  .auth-form { animation: auth-rise 0.5s var(--ease-standard) 0.18s both; }
+  .auth-demo { animation: auth-rise 0.5s var(--ease-standard) 0.28s both; }
+  .auth-foot { animation: auth-rise 0.5s var(--ease-standard) 0.36s both; }
+}
+
+/* --- responsive ------------------------------------------------------------------ */
+@media (max-width: 900px) {
+  .auth-grid { grid-template-columns: minmax(0, 1fr); }
+  .auth-side { display: none; }
+  .auth-brand-compact { display: inline-flex; }
+  .auth-brand-compact .auth-brand-name { color: var(--ink); font-size: 1.15rem; }
+  .auth-main { padding: 2rem 1.1rem; align-items: flex-start; }
+  .auth-card { max-width: 30rem; }
+}

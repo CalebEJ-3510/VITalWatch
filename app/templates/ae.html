@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, severity_badge, page_head, note %}
+{% from "_queue.html" import queue_toolbar, queue_summary, queue_empty, pagination, inspector_mount %}
+{% block title %}Adverse events — {{ settings.app_name }}{% endblock %}
+
+{# The AE register as an operational worklist (Phase 4, prompt.md §10.2).
+   Report-like table -> reusable queue: search scoped to identifiers, allowlisted
+   filters, explicit sorts, honest counts, URL-preserved state, and the worklist
+   + inspector pattern (§7.2) wired end-to-end: a row opens in the side panel,
+   the full case record stays one click deeper at a real, shareable URL. #}
+
+{% block content %}
+{% call page_head('Adverse events',
+        'Every reported event with its live statutory clock — re-derived on every read, never the intake-time snapshot.') %}
+  <a href="/signals" class="btn btn-secondary">Safety signals →</a>
+{% endcall %}
+
+{{ queue_toolbar('/ae', result, spec.filters, spec.sorts, spec.search_label, dynamic_options) }}
+{{ queue_summary(result, '/ae', 'events') }}
+
+{% if result.rows %}
+<ul class="q-list" data-inspectable data-record-base="/ae/" aria-label="Adverse-event queue">
+  {% for e in result.rows %}
+  {% set left = e.hours_left %}
+  <li class="q-row {{ 'q-row-breach' if e.timeline_status == 'breached' else 'q-row-warn' if e.timeline_status == 'due_soon' else '' }}"
+      data-inspect-url="/ae/{{ e.id }}" data-record-url="/ae/{{ e.id }}" data-inspect-id="{{ e.id }}">
+    <span class="q-row-flag">
+      {% if e.clock_unknown %}
+        {{ badge('Deadline unknown', 'bad') }}
+      {% elif e.timeline_status == 'breached' %}
+        {{ badge('Breached ' ~ (-left)|round(0)|int ~ 'h ago', 'bad') }}
+      {% elif e.timeline_status == 'due_soon' %}
+        {{ badge(left|round(0)|int ~ 'h left', 'warn') }}
+      {% elif e.timeline_status == 'on_track' %}
+        {{ badge((left|round(0)|int if left is not none else '') ~ 'h left', 'good') }}
+      {% else %}
+        {{ badge('No clock', 'neutral') }}
+      {% endif %}
+    </span>
+    <span class="q-row-main">
+      <span class="q-row-idline">
+        <a class="q-row-id" href="/ae/{{ e.id }}">{{ e.id }}</a>
+        <span class="q-row-ctx">
+          participant <span class="code">{{ e.participant_code }}</span> ·
+          <a href="/trial/{{ e.trial_id }}">{{ e.trial_id }}</a>
+        </span>
+        {% if e.serious %}{{ badge('SAE', 'bad') }}{% endif %}
+        {{ severity_badge(e.severity) }}
+      </span>
+      <span class="q-row-reason">{{ e.narrative }}</span>
+      <span class="q-row-meta">
+        reported {{ e.reported_at | dt }} · onset {{ e.onset_date | d }} · causality {{ e.causality | label }}
+      </span>
+    </span>
+    <span class="q-row-state">
+      {% if e.coded_term %}
+        <span class="q-row-due">{{ e.coded_term }} <span class="code">{{ e.coded_code }}</span></span>
+        <span class="q-row-due">{{ e.coding_source | label }} · reviewed</span>
+      {% else %}
+        {{ badge('Uncoded', 'warn') }}
+        <span class="q-row-due">awaiting Safety Officer review</span>
+      {% endif %}
+      <a class="q-row-action" href="/ae/{{ e.id }}">Open case →</a>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{{ pagination('/ae', result) }}
+{% else %}
+{{ queue_empty(result, '/ae', 'events',
+               'No adverse events reported.',
+               'Events filed by a participant or a staff member appear here with their reporting clock.') }}
+{% endif %}
+
+{{ inspector_mount('adverse-event queue') }}
+
+{% if can_file %}
+<section class="mt-8 panel p-5" id="intake">
+  <h2 class="panel-title">Report an adverse event</h2>
+  <p class="mt-2 text-sm" style="color:var(--muted)">
+    The clock starts at data entry, not event awareness. External report submission is not
+    tracked; this is not evidence of regulatory compliance. Dates use
+    {{ settings.clinical_timezone }}; displayed timestamps are UTC.
+  </p>
+  <form method="post" action="/ae" class="mt-4 grid gap-4 md:grid-cols-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label class="block text-sm">
+      <span class="label">Trial</span>
+      <select name="trial_id" required class="field mt-1">
+        {% for s in trials %}<option value="{{ s.id }}">{{ s.id }} — {{ s.title }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Participant code</span>
+      <input name="participant_code" required placeholder="AIIA-001-004" class="field mt-1">
+      <span class="mt-1 block text-xs" style="color:var(--faint)">Pseudonymous code only — no participant name.</span>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Onset date</span>
+      <input name="onset_date" type="date" required class="field mt-1">
+    </label>
+
+    <div class="block text-sm md:col-span-3">
+      <label class="block">
+        <span class="label">Narrative as reported</span>
+        <textarea name="narrative" required rows="2" class="field mt-1"
+                  placeholder="severe abdominal pain, participant hospitalised for observation"
+                  data-coding-source></textarea>
+      </label>
+      {# Live coding-assist (§7.3): debounced POST /api/pv/code, request body
+         only — the narrative never travels in a URL. The suggestion is advisory;
+         a Safety Officer confirms or corrects it at review. #}
+      <div class="assist" data-coding-assist hidden aria-live="polite"></div>
+    </div>
+
+    <label class="block text-sm">
+      <span class="label">Severity</span>
+      <select name="severity" class="field mt-1">
+        <option value="mild">Mild</option>
+        <option value="moderate">Moderate</option>
+        <option value="severe">Severe</option>
+      </select>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Causality (WHO-UMC)</span>
+      <select name="causality" class="field mt-1">
+        <option value="unrelated">Unrelated</option>
+        <option value="unlikely">Unlikely</option>
+        <option value="possible" selected>Possible</option>
+        <option value="probable">Probable</option>
+        <option value="certain">Certain</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Outcome</span>
+      <select name="outcome" class="field mt-1">
+        <option value="recovering" selected>Recovering</option>
+        <option value="recovered">Recovered</option>
+        <option value="not_recovered">Not recovered</option>
+        <option value="recovered_with_sequelae">Recovered with sequelae</option>
+        <option value="fatal">Fatal</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </label>
+
+    <div class="flex items-center justify-between gap-4 md:col-span-3">
+      <label class="flex items-center gap-2 text-sm" style="color:var(--ink-2)">
+        <input type="checkbox" name="serious" value="true" class="rounded" style="border-color:var(--rule-strong)">
+        Serious — starts the 24-hour reporting clock
+      </label>
+      <button type="submit" class="btn btn-primary px-5 py-2">File event</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+{% call note('About coding and the MedDRA position') %}
+  <p>Narratives are coded against <code class="code">app/terms.csv</code>, a vocabulary
+  written for this demonstration. MedDRA and WHODrug are the licensed dictionaries a production
+  system would use; we do not have them and do not approximate them, which is why every coded
+  row reads <span class="font-medium">curated</span> as its source.</p>
+  <p>An event matching nothing confidently stays
+  <span class="font-medium">Uncoded</span> rather than being guessed into the wrong bucket.
+  The suggestion a filer sees while typing is advisory only — it becomes the record's coding
+  solely through a Safety Officer's confirm/correct decision, which is audited.</p>
+{% endcall %}
+
+{% endblock %}

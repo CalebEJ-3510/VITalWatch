@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, severity_badge, page_head, note %}
+{% block title %}Raise escalation — {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+{% call page_head('Raise an escalation', back='/escalations', back_label='Escalation inbox') %}{% endcall %}
+
+<section class="panel p-5">
+  <form method="post" action="/escalations" class="grid gap-4 md:grid-cols-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label class="block text-sm">
+      <span class="label">Trial</span>
+      <select name="trial_id" required class="field mt-1">
+        {% for t in trials %}<option value="{{ t.id }}">{{ t.id }} — {{ t.title }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Escalation type</span>
+      <select name="escalation_type" required class="field mt-1">
+        {% for t in allowed_types %}<option value="{{ t }}">{{ t|label }}</option>{% endfor %}
+      </select>
+      <span class="mt-1 block text-xs text-slate-400">
+        Only the type(s) your role may raise are offered — spec section 23.
+      </span>
+    </label>
+
+    <label class="block text-sm">
+      <span class="label">Severity</span>
+      <select name="severity" required class="field mt-1">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high" selected>High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </label>
+
+    <label class="block text-sm md:col-span-2">
+      <span class="label">Reason</span>
+      <textarea name="reason" required rows="3" placeholder="What was observed, and why it warrants pausing the trial."
+                class="field mt-1"></textarea>
+    </label>
+
+    <label class="block text-sm md:col-span-2">
+      <span class="label">Recommended action (optional)</span>
+      <input name="recommended_action" class="field mt-1"
+             placeholder="e.g. Request corrective action and re-review monitoring cadence.">
+    </label>
+
+    <div class="md:col-span-2 rounded border border-[color:var(--breach-rule)] bg-[color:var(--breach-bg)] px-4 py-3 text-sm text-[color:var(--breach)]">
+      Raising this escalation pauses the trial immediately.
+      A safety concern additionally starts a {{ settings.statutory_clock_hours }}-hour statutory response clock
+      (configurable — spec section 14).
+    </div>
+
+    <div class="md:col-span-2">
+      <button type="submit" class="btn btn-primary px-5 py-2">Raise escalation and pause trial</button>
+    </div>
+  </form>
+</section>
+
+{% endblock %}

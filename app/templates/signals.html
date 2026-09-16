@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tile, badge, page_head, note %}
+{% from "_queue.html" import queue_toolbar, queue_summary, queue_empty, pagination %}
+{% block title %}Safety signals — {{ settings.app_name }}{% endblock %}
+
+{# PRR-ranked signals as a worklist (Phase 4, §10.2). Every row carries its PRR
+   against the screening threshold as a reference mark — the value means nothing
+   without the line, which is the system's signature. Rows open the signal
+   workspace (§11.3): one trial/term pair, its 2×2, its cases, its caveats. #}
+
+{% block content %}
+{% call page_head('Safety signals',
+        'Coded terms ranked by over-representation in one trial against the rest of the portfolio — a triage order for human review, not a finding.') %}
+  <a href="/ae" class="btn btn-secondary">← Adverse events</a>
+{% endcall %}
+
+<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+  {{ tile('Coded events', coded_total, 'of ' ~ ae_total ~ ' reported') }}
+  {{ tile('Trial/term pairs', result.total, 'with at least ' ~ min_cases ~ ' cases') }}
+  {{ tile('Meeting threshold', flagged|length,
+          'PRR ≥ ' ~ threshold ~ ' and ≥ ' ~ case_floor ~ ' cases',
+          'bad' if flagged else 'good') }}
+  {{ tile('Vocabulary', term_count, 'curated terms, not MedDRA') }}
+</div>
+
+<div class="mt-6">
+{{ queue_toolbar('/signals', result, spec.filters, spec.sorts, spec.search_label, dynamic_options) }}
+{{ queue_summary(result, '/signals', 'trial/term pairs') }}
+</div>
+
+{% if result.rows %}
+<ul class="q-list" aria-label="Signal queue">
+  {% for s in result.rows %}
+  {% set share_here = (100 * s.cases / s.trial_events) %}
+  {% set share_else = (100 * s.other_cases / s.other_events) if s.other_events else 0 %}
+  <li class="q-row {{ 'q-row-breach' if s.flagged else '' }}">
+    <span class="q-row-flag">
+      {% if s.flagged %}
+        {{ badge('Signal', 'bad') }}
+      {% elif s.cases < case_floor %}
+        {{ badge('Below floor', 'neutral') }}
+      {% else %}
+        {{ badge('Within expectation', 'good') }}
+      {% endif %}
+    </span>
+    <span class="q-row-main">
+      <span class="q-row-idline">
+        <a class="q-row-id" href="/signals/{{ s.trial_id }}/{{ s.coded_term | urlencode }}">{{ s.coded_term }}</a>
+        <span class="code q-row-ctx">{{ s.coded_code }}</span>
+        <span class="q-row-ctx"><a href="/trial/{{ s.trial_id }}">{{ s.trial_id }}</a> · {{ s.trial_title }}</span>
+      </span>
+      <span class="q-row-meta">
+        {{ s.cases }} case{{ '' if s.cases == 1 else 's' }}{% if s.serious %} ({{ s.serious }} serious){% endif %}
+        · {{ share_here | round(0) | int }}% of this trial's coded events
+        vs {{ share_else | round(0) | int }}% elsewhere
+      </span>
+      <span class="q-row-ref">
+        {% if s.prr is not none %}
+          {# PRR on a track capped at 2× threshold; the indigo tick is the
+             screening line (PRR ≥ 2). The value is judged against the line —
+             never shown as a bare number. #}
+          {% set scale = threshold * 2 %}
+          <span class="ref" role="img" aria-label="PRR {{ '%.2f' | format(s.prr) }} against threshold {{ threshold }}">
+            <span class="ref-fill {{ 'ref-fill-breach' if s.flagged else 'ref-fill-within' }}"
+                  style="width: {{ [100 * s.prr / scale, 100] | min }}%"></span>
+            <span class="ref-mark" style="left: 50%" title="Screening threshold — PRR {{ threshold }}"></span>
+          </span>
+          <span class="q-row-ref-num">{{ '%.2f' | format(s.prr) }}×</span>
+        {% else %}
+          <span class="q-row-ref-num" style="color:var(--breach)">no cases elsewhere</span>
+          <span class="q-row-meta">— unprecedented in this portfolio; the ratio is undefined, not infinite</span>
+        {% endif %}
+      </span>
+    </span>
+    <span class="q-row-state">
+      {% if s.flagged %}
+        <span class="q-row-due q-row-due-bad">meets PRR ≥ {{ threshold }} with {{ s.cases }} cases</span>
+        <span class="q-row-due">a hypothesis for review — not causation</span>
+      {% else %}
+        <span class="q-row-due">below the screening line</span>
+      {% endif %}
+      <a class="q-row-action" href="/signals/{{ s.trial_id }}/{{ s.coded_term | urlencode }}">Open signal →</a>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{{ pagination('/signals', result) }}
+{% else %}
+{{ queue_empty(result, '/signals', 'trial/term pairs',
+               'No trial/term pair reaches ' ~ min_cases ~ ' cases.',
+               'Signals are re-derived on every read from the coded event set; uncoded events are excluded from both sides of the ratio.') }}
+{% endif %}
+
+{% call note('Method: proportional reporting ratio, and what it does not claim') %}
+  <p>For a term in one trial, over a 2×2 table — <span class="code">a</span> this term here,
+  <span class="code">b</span> other terms here, <span class="code">c</span> this term
+  elsewhere, <span class="code">d</span> other terms elsewhere:
+  <span class="code">PRR = (a/(a+b)) ÷ (c/(c+d))</span>. Screening threshold
+  <span class="font-medium">PRR ≥ {{ threshold }} with at least {{ case_floor }} cases</span>.
+  The case minimum is not padding — with one case the ratio is arithmetically enormous and
+  epidemiologically meaningless.</p>
+  <p><span class="font-medium">Not an incidence rate.</span> The denominator is other reports,
+  not patients exposed. <span class="font-medium">Not causation</span> — a signal is a hypothesis
+  for a human to investigate; causality assessment is a separate clinical judgement on each case.
+  Volumes here are small, so no chi-square or confidence interval is reported: at these counts
+  both would be noise, and the case count is stated plainly instead.</p>
+  <p>Uncoded events are excluded from both sides of the ratio rather than counted as a category —
+  an absence of information should not quietly depress every ratio in the portfolio. Terms come
+  from <code class="code">app/terms.csv</code>, curated for this demonstration, not MedDRA.</p>
+{% endcall %}
+
+{% endblock %}

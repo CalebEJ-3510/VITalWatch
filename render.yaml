@@ -1,0 +1,34 @@
+# One web service. No worker, no build step beyond pip.
+#
+# The database is Supabase Postgres, reached over DATABASE_URL. That variable is marked
+# sync:false so the connection string is entered in the Render dashboard and never lands
+# in this repository.
+#
+# With DATABASE_URL absent the service still runs, on SQLite seeded at startup from a
+# fixed seed — a byte-identical portfolio rather than an empty one. That is the fallback
+# if Supabase is unreachable, and it is why the deploy cannot be broken by a database
+# outage: delete the variable, redeploy, and the demo still works.
+services:
+  - type: web
+    name: vitalwatch
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Supabase connection string. sync:false means Render prompts for it once and
+      # stores it as a secret; it is never committed. Use the POOLER host — Render's
+      # free tier has no IPv6, and Supabase's direct host is IPv6-only.
+      - key: DATABASE_URL
+        sync: false
+      # Every threshold is configuration, not code. Overriding one here and redeploying
+      # changes what the dashboard alerts on, with no source change.
+      - key: ENROLMENT_LAG_PCT
+        value: "80"
+      - key: ETHICS_RENEWAL_DAYS
+        value: "60"
+      - key: MONITORING_OVERDUE_DAYS
+        value: "14"
+      - key: PYTHON_VERSION
+        value: "3.12"

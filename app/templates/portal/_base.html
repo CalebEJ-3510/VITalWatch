@@ -1,0 +1,172 @@
+{#-
+  portal/_base.html — the CTMS portal shell (spec sections 38, 39).
+
+  The new top-strip + portal-rail layer that sits INSIDE the institutional shell
+  (app/templates/base.html). It does not replace base.html: base.html supplies the
+  persistent CTMS shell, while this template adds the approved role-specific navigation
+  and workflow context:
+
+    * a top bar — CTMS identity, the portal this page belongs to, global search,
+      a notification tray and the signed-in user,
+    * a breadcrumb trail under the top bar,
+    * a portal rail — the navigation for THIS role's own work, distinct from the
+      institutional oversight rail,
+    * a flash-message line, the real replacement for ad-hoc query-parameter banners.
+
+  There is deliberately no role/workspace switcher: exactly one dashboard exists
+  per role (prompt.md §5), and a switcher against that reality would imply a
+  multi-lens account model the backend does not have.
+
+  Context contract (a route renders this via the existing `page()` helper in
+  app/main.py, which already supplies `settings`, `request`, `csrf_token`,
+    `current_user`). Everything below is optional — each variable falls back to a safe default so the shell renders on
+  its own, and a route-provided value always wins over the in-template default:
+
+    portal_id                 str    machine id of the portal, e.g. "volunteer"
+    portal_label              str    shown next to the CTMS mark, e.g. "Volunteer portal"
+    portal_nav_sections       list   [(section_label, [(href, label, badge|None), ...]), ...]
+    portal_crumbs             list   [(label, href|None), ...] — last entry's href is None
+    portal_search_action      str    global-search GET target, default "/search"
+    portal_notifications      list   [{"label": str, "href": str, "tone": good|warn|bad}, ...]
+    portal_notification_count int    bell badge; defaults to the list length
+    portal_flash              list   [(tone, message), ...] — tone: good|warn|bad|info
+
+  Badge tones use the repository's existing three-state discipline
+  (_macros.html: breached / needs review / within tolerance, plus neutral).
+  This template introduces no new colour.
+-#}
+{% extends "base.html" %}
+{% set portal_label = portal_label | default('Portal') %}
+{% set portal_search_action = portal_search_action | default('/search') %}
+{% set portal_nav_sections = portal_nav_sections | default([]) %}
+{% set portal_crumbs = portal_crumbs | default([]) %}
+{% set portal_notifications = portal_notifications | default([]) %}
+{% set portal_notification_count = portal_notification_count | default(portal_notifications | length) %}
+{% set portal_flash = portal_flash | default([]) %}
+
+{% block title %}{{ portal_label }} — {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+  {# ---- top bar ------------------------------------------------------------------ #}
+  <div class="panel mb-4 px-4 py-2.5" role="banner">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <a href="/" class="flex shrink-0 items-center gap-2">
+        <img src="/static/mark.svg" alt="" width="24" height="24" class="h-6 w-6 shrink-0">
+        <span class="text-[13px] font-semibold tracking-tight" style="color:var(--ink)">{{ settings.app_name }}</span>
+        <span class="chip">{{ portal_label }}</span>
+      </a>
+
+      {# Global search (spec section 18). The /search route is Leadership-only
+         (main.py::global_search) — rendering this form for any other role
+         would offer an action the server refuses, which §18.8 forbids: the
+         nav reflects the gate, never substitutes for it. Other roles search
+         through the command palette (/api/search), which is permission-
+         filtered for every signed-in role. #}
+      {% if current_user and current_user.role.value == 'leadership' %}
+      <form action="{{ portal_search_action }}" method="get" class="min-w-[240px] max-w-xl flex-1" role="search">
+        <label class="sr-only" for="portal-search">Global search</label>
+        <input type="search" id="portal-search" name="q" class="field"
+               placeholder="Search trials, participants, AEs, escalations, reports…"
+               value="{{ q | default('') }}" autocomplete="off">
+      </form>
+      {% endif %}
+
+      <div class="ml-auto flex items-center gap-3">
+        {# Notification tray. A <details> element so it works with no client
+           javascript — the one place the shell is allowed to rely on the browser. #}
+        <details class="relative">
+          <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+                   aria-label="Notifications">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            {% if portal_notification_count %}<span class="pill pill-breach">{{ portal_notification_count }}</span>{% endif %}
+          </summary>
+          <div class="absolute right-0 z-30 mt-1 w-80 rounded-lg border border-slate-200 bg-white shadow-lg" role="menu">
+            <div class="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Notifications
+            </div>
+            <ul class="max-h-72 overflow-auto py-1">
+              {% for n in portal_notifications %}
+              <li>
+                <a href="{{ n.href }}"
+                   class="flex items-start gap-2 px-3 py-2 text-[12.5px] text-slate-700 hover:bg-slate-50">
+                  <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                        style="background:{% if n.tone == 'bad' %}var(--breach){% elif n.tone == 'warn' %}var(--review-hi){% else %}var(--within-hi){% endif %}"></span>
+                  <span class="min-w-0">{{ n.label }}</span>
+                </a>
+              </li>
+              {% else %}
+              <li class="px-3 py-4 text-center text-[12px] text-slate-400">Nothing waiting.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </details>
+
+        {# The signed-in user and their role, stated rather than assumed — the same
+           honesty as base.html's "Synthetic data only" mark. #}
+        <div class="flex items-center gap-2 border-l border-slate-200 pl-3">
+          <div class="leading-tight text-right">
+            <div class="max-w-[140px] truncate text-[12px] font-medium text-slate-800">
+              {{ current_user.display_name if current_user else 'Not signed in' }}
+            </div>
+            <div class="text-[10.5px] uppercase tracking-wide text-slate-400">
+              {{ current_user.role.value | label if current_user else '' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ---- flash messages ----------------------------------------------------------- #}
+  {% for flash_tone, flash_message in portal_flash %}
+  <div class="mb-3 rounded-md border-l-4 px-3 py-2 text-[13px] leading-relaxed"
+       style="border-color:{% if flash_tone == 'good' %}var(--within){% elif flash_tone == 'warn' %}var(--review-hi){% elif flash_tone == 'bad' %}var(--breach){% elif flash_tone == 'info' %}var(--reference){% else %}var(--rule-strong){% endif %};
+              background:{% if flash_tone == 'good' %}var(--within-bg){% elif flash_tone == 'warn' %}var(--review-bg){% elif flash_tone == 'bad' %}var(--breach-bg){% elif flash_tone == 'info' %}var(--reference-2){% else %}var(--surface-sunk){% endif %};"
+       role="status">
+    {{ flash_message }}
+  </div>
+  {% endfor %}
+
+  {# ---- breadcrumbs --------------------------------------------------------------- #}
+  <nav class="mb-4 flex flex-wrap items-center gap-1 text-[12px] text-slate-500" aria-label="Breadcrumb">
+    <a href="/" class="hover:text-[color:var(--reference)]">CTMS</a>
+    <a href="#{{ portal_id | default('portal') }}" class="hover:text-[color:var(--reference)]">{{ portal_label }}</a>
+    {% for crumb_label, crumb_href in portal_crumbs %}
+    <span aria-hidden="true" class="text-slate-300">/</span>
+    {% if crumb_href %}
+      <a href="{{ crumb_href }}" class="hover:text-[color:var(--reference)]">{{ crumb_label }}</a>
+    {% else %}
+      <span class="font-medium text-slate-800" aria-current="page">{{ crumb_label }}</span>
+    {% endif %}
+    {% endfor %}
+  </nav>
+
+  {# ---- portal rail + page body ---------------------------------------------------- #}
+  <div class="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <aside class="panel p-2" aria-label="{{ portal_label }} navigation">
+      {% for section_label, section_links in portal_nav_sections %}
+      <p class="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[.12em] text-slate-400">{{ section_label }}</p>
+      {% for link_href, link_label, link_badge in section_links %}
+      <a href="{{ link_href }}"
+         class="mb-0.5 flex items-center justify-between gap-2 rounded-md px-3 py-2 text-[13px] font-medium
+                {% if request.url.path == link_href %}bg-indigo-50 text-[color:var(--reference)]{% else %}text-slate-600 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+        <span class="truncate">{{ link_label }}</span>
+        {% if link_badge %}<span class="pill pill-breach">{{ link_badge }}</span>{% endif %}
+      </a>
+      {% endfor %}
+      {% endfor %}
+      {% if not portal_nav_sections %}
+      <p class="px-3 py-4 text-[12px] text-slate-400">No navigation configured for this portal.</p>
+      {% endif %}
+    </aside>
+
+    <div class="min-w-0">
+      {% block portal_main %}{% endblock %}
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,157 @@
+{#-
+  portal/investigator_dashboard.html — the Investigator dashboard (prompt.md §9.3).
+
+  First-screen question (§5.1): "Which submissions and escalations need my
+  decision today?" The composition answers exactly that, oldest-waiting first:
+
+    * eligibility queue — registration_submissions for the trial in focus whose
+      status is not yet decided, each with its AI pre-screen finding beside it
+      (advisory, versioned; the decision is the Investigator's, and the record
+      names them);
+    * protocol-deviation escalations — especially the ones whose Company
+      response awaits the Investigator's resolve-or-escalate review;
+    * deviations on record, for context.
+
+  Scope honesty (§9.3.1): trial access here is the portfolio trial list,
+  selected below — NOT a stored "my trials" assignment. No assignment schema
+  exists in this build, and this page says so rather than implying one.
+
+  Context contract (supplied by app/main.py::investigator_dashboard):
+
+    trials          list   all trials rows (id, title) — the selectable scope
+    selected_trial  str    the trial id currently in focus
+    t, k            row    the selected trial row and its kpi.trial_kpi
+    submissions     list   registration_submissions for the trial, oldest first,
+                           LEFT JOIN ai_findings: ai_finding, ai_explanation,
+                           ai_engine, ai_confidence
+    deviations      list   deviations rows for the trial
+    escalations     list   escalations for the trial (any type/status)
+-#}
+{% extends "portal/_base.html" %}
+{% from "_macros.html" import page_head, badge %}
+{% from "portal/_partials.html" import p_metric, p_status_badge, p_empty, p_panel_head, p_suggestion %}
+{% set portal_id='investigator' %}{% set portal_label='Investigator portal' %}{% set portal_crumbs=[('Dashboard',None)] %}
+{% set pending_subs = submissions | rejectattr('status', 'in', ['eligible', 'not_eligible']) | list %}
+{% set decided_subs = submissions | selectattr('status', 'in', ['eligible', 'not_eligible']) | list %}
+{% set review_escalations = escalations | selectattr('status', 'equalto', 'company_responded') | list %}
+{% set open_escalations = escalations | selectattr('status', 'equalto', 'open') | list %}
+{% set portal_nav_sections=[('Conduct',[('/portal/investigator','Dashboard',None),('/trial/' ~ selected_trial,'Trial workspace',None),('/escalations','Escalation inbox',None)]),('Decision queues',[('#eligibility','Eligibility queue',pending_subs|length or None),('#escalations','Deviation reviews',review_escalations|length or None),('#deviations','Deviations on record',None)])] %}
+{% block portal_main %}
+{% call page_head('Investigator dashboard','Which submissions and escalations need your decision today — eligibility calls and protocol-deviation reviews, oldest-waiting first.') %}
+  <a class="btn btn-secondary" href="/escalations/new">Raise protocol deviation →</a>
+{% endcall %}
+
+{# Trial context: a selection, honestly not an assignment (§9.3.1). #}
+<div class="panel px-4 py-3">
+  <form method="get" action="/portal/investigator" class="flex flex-wrap items-center gap-3">
+    <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-500" for="trial-sel">Trial in focus</label>
+    <select id="trial-sel" name="trial" onchange="this.form.submit()" class="field" style="max-width:360px">
+      {% for tr in trials %}<option value="{{ tr.id }}" {{ 'selected' if tr.id == selected_trial else '' }}>{{ tr.id }} — {{ tr.title }}</option>{% endfor %}
+    </select>
+  </form>
+  <p class="mt-2 text-[11.5px] leading-relaxed text-slate-400">
+    Within my authorized scope: the portfolio trial list, selected above. This is not a stored
+    “my trials” assignment — no assignment schema exists in this build, so nothing here implies one.
+  </p>
+</div>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-3">
+  {{ p_metric('Awaiting eligibility decision', pending_subs|length,
+              'oldest-waiting first', tone='warn' if pending_subs else 'good', href='#eligibility',
+              definition='registration_submissions for the trial in focus whose status is not yet eligible or not_eligible.') }}
+  {{ p_metric('Deviation responses to review', review_escalations|length,
+              'Company response filed — your resolve-or-escalate call', tone='warn' if review_escalations else 'good', href='#escalations',
+              definition='protocol_deviation escalations on this trial with status company_responded.') }}
+  {{ p_metric('Open escalations', open_escalations|length,
+              'raised, Company response pending', tone='neutral', href='#escalations',
+              definition='escalations on this trial with status open — the Company has not yet responded.') }}
+</div>
+
+{# ---- eligibility queue ---------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="eligibility">
+  {{ p_panel_head('Eligibility review queue', 'AI pre-screen informs; the Investigator decides — and the record names them') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Submission</th><th>Submitted</th><th>Status</th><th>AI pre-screen finding</th><th>Final decision</th></tr></thead>
+    <tbody>
+      {% for s in pending_subs %}
+      <tr>
+        <td class="code">{{ s.id[:8] }}</td>
+        <td class="text-xs tabular-nums text-slate-500">{{ s.submitted_at | dt }}</td>
+        <td>{{ p_status_badge(s.status) }}</td>
+        <td class="text-xs">
+          {% if s.ai_finding %}
+            {{ p_suggestion(s.ai_finding | label) }}
+            <div class="mt-0.5 text-[11px] text-slate-400">engine {{ s.ai_engine }} · confidence {{ s.ai_confidence }}</div>
+          {% else %}
+            <span class="text-slate-400">Awaiting pre-screen</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="/portal/investigator/eligibility/{{ s.id }}" class="flex flex-wrap gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <select class="field" name="decision" aria-label="Eligibility decision">
+              <option value="eligible">Eligible</option>
+              <option value="not_eligible">Not eligible</option>
+              <option value="more_information_required">More information required</option>
+            </select>
+            <input class="field" name="reason" required placeholder="Investigator rationale (recorded)">
+            <button class="btn btn-primary">Record decision</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      {{ p_empty(5, 'No submissions await an eligibility decision on this trial.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% if decided_subs %}
+  <p class="border-t border-slate-100 px-4 py-2 text-[11.5px] text-slate-400">
+    {{ decided_subs | length }} already decided on this trial —
+    {{ decided_subs | selectattr('status', 'equalto', 'eligible') | list | length }} eligible,
+    {{ decided_subs | selectattr('status', 'equalto', 'not_eligible') | list | length }} not eligible.
+    Decisions are final here; corrections happen through the audit-visible record, not silent edits.
+  </p>
+  {% endif %}
+</section>
+
+{# ---- protocol-deviation escalations ---------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="escalations">
+  {{ p_panel_head('Protocol-deviation escalations', 'on the trial in focus — the review package opens on the escalation page') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Escalation</th><th>Type</th><th>Severity</th><th>Status</th><th>Raised</th><th>Package</th></tr></thead>
+    <tbody>
+      {% for e in escalations %}
+      <tr class="{{ 'row-breach' if e.status == 'company_responded' else '' }}">
+        <td>
+          <span class="code">{{ e.id[:8] }}</span>
+          <div class="max-w-xs truncate text-xs text-slate-500">{{ e.reason[:90] }}{{ '…' if e.reason | length > 90 else '' }}</div>
+        </td>
+        <td>{{ badge(e.escalation_type | label, 'neutral') }}</td>
+        <td>{{ badge(e.severity | label, {'critical': 'bad', 'high': 'bad', 'medium': 'warn'}.get(e.severity, 'neutral')) }}</td>
+        <td>{{ p_status_badge(e.status) }}</td>
+        <td class="text-xs tabular-nums text-slate-400">{{ e.created_at | d }}</td>
+        <td><a class="text-[color:var(--reference)] hover:underline" href="/escalations/{{ e.id }}">
+          {{ 'Review response →' if e.status == 'company_responded' else 'Open →' }}</a></td>
+      </tr>
+      {% else %}
+      {{ p_empty(6, 'No escalations on this trial.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+{# ---- deviations on record ---------------------------------------------------------- #}
+<section class="panel mt-5 overflow-hidden" id="deviations">
+  {{ p_panel_head('Protocol deviations on record', 'detect → pause → Company response → Investigator review') }}
+  <div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>Trial</th><th>Detected</th><th>Category</th><th>Severity</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for d in deviations %}
+      <tr><td class="code">{{ d.trial_id }}</td><td class="text-xs tabular-nums text-slate-500">{{ d.detected_date | d }}</td><td>{{ d.category }}</td><td>{{ badge(d.severity, 'warn') }}</td><td>{{ d.description }}</td></tr>
+      {% else %}
+      {{ p_empty(5, 'No protocol deviations recorded.') }}
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

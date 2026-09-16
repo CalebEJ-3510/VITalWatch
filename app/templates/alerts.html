@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, page_head, note %}
+{% from "_queue.html" import queue_toolbar, queue_summary, queue_empty, pagination %}
+{% block title %}Operational alerts — {{ settings.app_name }}{% endblock %}
+
+{# Portfolio alerts as a queue (Phase 4, §10.2). Alerts are computed on read —
+   never stored — so the set is always current and a stale critical banner can
+   never outlive the data that raised it. Severity tiering is deliberate: a
+   breached statutory deadline outranks a slipping enrolment curve (§12.3). #}
+
+{% block content %}
+{% call page_head('Operational alerts',
+        'Threshold-driven findings across the portfolio, computed on read at ' ~ (as_of | dt) ~ ' UTC — never cached.') %}
+{% endcall %}
+
+{{ queue_toolbar('/alerts', result, spec.filters, spec.sorts, spec.search_label, dynamic_options) }}
+{{ queue_summary(result, '/alerts', 'alerts') }}
+
+{% if result.rows %}
+<ul class="q-list" aria-label="Alert queue">
+  {% for a in result.rows %}
+  <li class="q-row {{ 'q-row-breach' if a.severity == 'critical' else 'q-row-warn' if a.severity == 'warning' else '' }}">
+    <span class="q-row-flag">
+      {{ badge(a.severity | capitalize, {'critical':'bad','warning':'warn','info':'neutral'}.get(a.severity, 'neutral')) }}
+    </span>
+    <span class="q-row-main">
+      <span class="q-row-idline">
+        <a class="q-row-id" href="{{ a.deep_link }}">{{ a.trial_id }}</a>
+        <span class="q-row-ctx">{{ a.rule | label }} · {{ a.trial_title }}</span>
+      </span>
+      <span class="q-row-reason">{{ a.message }}</span>
+      <span class="q-row-meta">raised {{ a.raised_at | dt }} · threshold from environment configuration</span>
+    </span>
+    <span class="q-row-state">
+      <a class="q-row-action" href="{{ a.deep_link }}">Open affected record →</a>
+    </span>
+  </li>
+  {% endfor %}
+</ul>
+{{ pagination('/alerts', result) }}
+{% else %}
+{{ queue_empty(result, '/alerts', 'alerts',
+               'No alert rule is currently firing.',
+               'The four rules — SAE timeline breach, enrolment lag, ethics renewal due, monitoring visit overdue — are evaluated on every read against live thresholds.') }}
+{% endif %}
+
+{% call note('What an alert is — and is not') %}
+  <p>An alert is a threshold crossing, computed when this page loads from rules whose
+  cut-offs live in environment configuration (<code class="code">ENROLMENT_LAG_PCT</code>,
+  <code class="code">ETHICS_RENEWAL_DAYS</code>, <code class="code">MONITORING_OVERDUE_DAYS</code>).
+  Acknowledging an alert is not resolving the underlying condition, and a quiet page is
+  not proof of compliance — it means no rule fired at read time.</p>
+{% endcall %}
+
+{% endblock %}
