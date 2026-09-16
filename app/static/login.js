@@ -48,4 +48,11 @@
     submit.disabled = true;
     submit.textContent = "Signing in…";
   });
+
+  /* Escape key returns to home page */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      window.location.href = "/";
+    }
+  });
 })();

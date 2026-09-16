@@ -47,26 +47,34 @@
 {% block title %}{{ portal_label }} — {{ settings.app_name }}{% endblock %}
 
 {% block content %}
-  {# ---- top bar ------------------------------------------------------------------ #}
-  <div class="panel mb-4 px-4 py-2.5" role="banner">
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <a href="/" class="flex shrink-0 items-center gap-2">
-        <img src="/static/mark.svg" alt="" width="24" height="24" class="h-6 w-6 shrink-0">
-        <span class="text-[13px] font-semibold tracking-tight" style="color:var(--ink)">{{ settings.app_name }}</span>
-        <span class="chip">{{ portal_label }}</span>
-      </a>
+  {# ---- contextual portal toolbar with breadcrumbs ------------------------------- #}
+  <div class="panel mb-4 px-4 py-2.5" role="region" aria-label="Portal breadcrumbs and context">
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <nav class="flex flex-wrap items-center gap-1.5 text-[12px] text-slate-500" aria-label="Breadcrumb">
+        <a href="/" class="flex items-center gap-1.5 font-medium text-slate-600 hover:text-[color:var(--reference)] transition-colors">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span>Home</span>
+        </a>
+        <span aria-hidden="true" class="text-slate-300">/</span>
+        <span class="chip font-medium">{{ portal_label }}</span>
+        {% for crumb_label, crumb_href in portal_crumbs %}
+        <span aria-hidden="true" class="text-slate-300">/</span>
+        {% if crumb_href %}
+          <a href="{{ crumb_href }}" class="hover:text-[color:var(--reference)] transition-colors">{{ crumb_label }}</a>
+        {% else %}
+          <span class="font-semibold text-slate-800" aria-current="page">{{ crumb_label }}</span>
+        {% endif %}
+        {% endfor %}
+      </nav>
 
-      {# Global search (spec section 18). The /search route is Leadership-only
-         (main.py::global_search) — rendering this form for any other role
-         would offer an action the server refuses, which §18.8 forbids: the
-         nav reflects the gate, never substitutes for it. Other roles search
-         through the command palette (/api/search), which is permission-
-         filtered for every signed-in role. #}
       {% if current_user and current_user.role.value == 'leadership' %}
-      <form action="{{ portal_search_action }}" method="get" class="min-w-[240px] max-w-xl flex-1" role="search">
+      <form action="{{ portal_search_action }}" method="get" class="min-w-[200px] max-w-md flex-1" role="search">
         <label class="sr-only" for="portal-search">Global search</label>
-        <input type="search" id="portal-search" name="q" class="field"
-               placeholder="Search trials, participants, AEs, escalations, reports…"
+        <input type="search" id="portal-search" name="q" class="field !py-1 text-xs"
+               placeholder="Search trials, participants, AEs…"
                value="{{ q | default('') }}" autocomplete="off">
       </form>
       {% endif %}
@@ -75,7 +83,7 @@
         {# Notification tray. A <details> element so it works with no client
            javascript — the one place the shell is allowed to rely on the browser. #}
         <details class="relative">
-          <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+          <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
                    aria-label="Notifications">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -105,8 +113,7 @@
           </div>
         </details>
 
-        {# The signed-in user and their role, stated rather than assumed — the same
-           honesty as base.html's "Synthetic data only" mark. #}
+        {# The signed-in user and their role #}
         <div class="flex items-center gap-2 border-l border-slate-200 pl-3">
           <div class="leading-tight text-right">
             <div class="max-w-[140px] truncate text-[12px] font-medium text-slate-800">
@@ -119,7 +126,6 @@
         </div>
       </div>
     </div>
-
   </div>
 
   {# ---- flash messages ----------------------------------------------------------- #}
@@ -131,20 +137,6 @@
     {{ flash_message }}
   </div>
   {% endfor %}
-
-  {# ---- breadcrumbs --------------------------------------------------------------- #}
-  <nav class="mb-4 flex flex-wrap items-center gap-1 text-[12px] text-slate-500" aria-label="Breadcrumb">
-    <a href="/" class="hover:text-[color:var(--reference)]">CTMS</a>
-    <a href="#{{ portal_id | default('portal') }}" class="hover:text-[color:var(--reference)]">{{ portal_label }}</a>
-    {% for crumb_label, crumb_href in portal_crumbs %}
-    <span aria-hidden="true" class="text-slate-300">/</span>
-    {% if crumb_href %}
-      <a href="{{ crumb_href }}" class="hover:text-[color:var(--reference)]">{{ crumb_label }}</a>
-    {% else %}
-      <span class="font-medium text-slate-800" aria-current="page">{{ crumb_label }}</span>
-    {% endif %}
-    {% endfor %}
-  </nav>
 
   {# ---- portal rail + page body ---------------------------------------------------- #}
   <div class="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">

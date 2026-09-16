@@ -82,6 +82,18 @@
     <div class="auth-card">
 
       <div class="auth-card-head">
+        <div class="auth-card-topbar">
+          <a href="/" class="auth-back-link" id="auth-back-home" title="Return to public home page">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>← Return to Home</span>
+            <kbd class="auth-kbd">Esc</kbd>
+          </a>
+          <span class="l-meta text-[11px] text-slate-400">Public Portal</span>
+        </div>
+
         <a href="/" class="auth-brand auth-brand-compact" aria-label="{{ settings.app_name }} — back to the home page">
           <img src="/static/mark.svg" alt="" width="28" height="28">
           <span class="auth-brand-name">{{ settings.app_name }}</span>
@@ -110,7 +122,10 @@
           <label for="password">Password</label>
           <input id="password" name="password" type="password" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary auth-submit" id="signin-submit">Sign in</button>
+        <div class="auth-actions">
+          <button type="submit" class="btn btn-primary auth-submit" id="signin-submit">Sign in</button>
+          <a href="/" class="btn btn-secondary auth-cancel" id="signin-cancel">Cancel &amp; Return to Home</a>
+        </div>
       </form>
 
       {# ---------------------------------------------- demo quick-fill chips

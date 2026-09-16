@@ -161,11 +161,67 @@ body.auth {
   border-color: var(--reference);
   box-shadow: 0 0 0 3px var(--reference-2);
 }
+.auth-card-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--paper-sunk);
+  border: 1px solid var(--paper-rule);
+  transition: all var(--motion-instant) var(--ease-standard);
+}
+.auth-back-link:hover {
+  color: var(--ink);
+  border-color: var(--paper-rule-strong);
+  box-shadow: var(--shadow);
+}
+.auth-kbd {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 0.1rem 0.35rem;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--paper-rule-strong);
+  border-radius: 3px;
+  color: var(--muted);
+}
+.auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
 .auth-submit {
-  margin-top: 0.25rem;
+  width: 100%;
   justify-content: center;
   padding: 0.7rem 1rem;
   font-size: 0.875rem;
+}
+.auth-cancel {
+  width: 100%;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--paper-rule-strong);
+  transition: all var(--motion-instant) var(--ease-standard);
+}
+.auth-cancel:hover {
+  color: var(--ink);
+  background: var(--paper-sunk);
+  border-color: var(--ink-2);
 }
 
 /* --- demo quick-fill chips ------------------------------------------------------

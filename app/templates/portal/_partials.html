@@ -22,15 +22,31 @@
    `href` wraps the tile in a link when given. #}
 {% macro p_metric(label, value, sub=None, tone='neutral', href=None, definition=None) -%}
   {% set skin = {'neutral': '', 'good': 'metric-within', 'warn': 'metric-review', 'bad': 'metric-breach'}.get(tone, '') %}
+  {% set val_str = value | string %}
+  {% set is_text = (val_str | length > 4 or ' ' in val_str) and not val_str.replace('%','').replace('-','').replace('.','').isdigit() %}
   {% set inner %}
-    <div class="label">{{ label }}</div>
-    <div class="metric-value mt-1 tabular-nums text-[1.75rem]">{{ value }}</div>
-    {% if sub %}<div class="metric-sub">{{ sub }}</div>{% endif %}
+    <div class="flex items-center justify-between gap-1">
+      <div class="label truncate">{{ label }}</div>
+    </div>
+    <div class="my-auto py-1.5 min-w-0">
+      {% if is_text %}
+        <div class="text-[1.25rem] sm:text-[1.35rem] font-bold leading-tight tracking-tight text-slate-800 truncate" title="{{ value }}">{{ value }}</div>
+      {% else %}
+        <div class="metric-value mt-0.5 tabular-nums text-[1.75rem] font-bold leading-none text-slate-900">{{ value }}</div>
+      {% endif %}
+    </div>
+    <div class="min-h-[1.25rem]">
+      {% if sub %}
+        <div class="metric-sub !mt-0 text-[11.5px] leading-tight text-slate-500 truncate" title="{{ sub }}">{{ sub }}</div>
+      {% else %}
+        <div class="text-[11.5px] leading-tight text-transparent select-none">&nbsp;</div>
+      {% endif %}
+    </div>
   {% endset %}
   {% if href %}
-    <a href="{{ href }}" class="metric {{ skin }}">{{ inner }}</a>
+    <a href="{{ href }}" class="metric {{ skin }} flex flex-col justify-between h-full min-h-[120px] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">{{ inner }}</a>
   {% else %}
-    <div class="metric {{ skin }}">{{ inner }}</div>
+    <div class="metric {{ skin }} flex flex-col justify-between h-full min-h-[120px]">{{ inner }}</div>
   {% endif %}
   {# The definition travels with the number — a KPI that is just an integer leaves
      every reader to invent its own meaning for it. #}
@@ -143,9 +159,12 @@
 {# Quick action tile (spec section 40's four volunteer quick actions live on
    these). `tone` skins the left edge: neutral | good | warn | bad. #}
 {% macro p_quick_action(label, href, hint=None, tone='neutral') -%}
-  <a href="{{ href }}" class="metric {{ {'good': 'metric-within', 'warn': 'metric-review', 'bad': 'metric-breach'}.get(tone, '') }} py-4">
-    <div class="text-[13.5px] font-semibold text-slate-800">{{ label }} →</div>
-    {% if hint %}<div class="mt-1 text-[12px] leading-snug text-slate-500">{{ hint }}</div>{% endif %}
+  <a href="{{ href }}" class="group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-400 hover:shadow-md">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[13.5px] font-semibold text-slate-800 group-hover:text-sky-600 transition-colors">{{ label }}</span>
+      <span class="text-slate-400 transition-transform duration-150 group-hover:translate-x-1 group-hover:text-sky-600" aria-hidden="true">→</span>
+    </div>
+    {% if hint %}<div class="mt-1.5 text-[12px] leading-snug text-slate-500">{{ hint }}</div>{% endif %}
   </a>
 {%- endmacro %}
 

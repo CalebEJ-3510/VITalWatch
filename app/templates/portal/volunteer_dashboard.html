@@ -81,26 +81,26 @@
   {# ---- the five section 40 widgets ------------------------------------------- #}
   <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
     {{ p_metric('My trial', my_trial.id if my_trial else '—',
-                (my_trial.status | label ~ ' · ' ~ my_trial.phase) if my_trial else 'not linked to a trial',
+                (my_trial.status | label ~ ' · Phase ' ~ my_trial.phase) if my_trial else 'Not linked to a trial',
                 tone='neutral', href='/trial/' ~ my_trial.id if my_trial else None,
                 definition='The one trial this participant is registered in. A participant belongs to exactly one trial.') }}
     {{ p_metric('Participation status', participant.status | label,
-                'screened ' ~ (participant.screened_date | d) ~ (' · enrolled ' ~ (participant.enrolled_date | d) if participant.enrolled_date else ''),
+                ('Enrolled ' ~ (participant.enrolled_date | d)) if participant.enrolled_date else ('Screened ' ~ (participant.screened_date | d)),
                 tone={'enrolled': 'good', 'screening': 'warn', 'withdrawn': 'neutral'}.get(participant.status, 'neutral'),
                 definition='participants.status for this participant row: enrolled, screening or withdrawn.') }}
     {{ p_metric('Upcoming appointments', appointments | length,
-                (appointments[0].title ~ ' · ' ~ (appointments[0].scheduled_at | d)) if appointments else 'none scheduled',
-                tone='warn' if appointments else 'good', href='#appointments',
+                (appointments[0].title ~ ' · ' ~ (appointments[0].scheduled_at | d)) if appointments else 'None scheduled',
+                tone='warn' if appointments else 'neutral', href='#appointments',
                 definition='Appointments scheduled for this participant that have not yet been completed.') }}
     {{ p_metric('Consent status',
-                (consent.status | label) if consent else 'not on file',
-                (('v' ~ consent.version ~ ' · ' ~ (consent.date | d)) if consent else ''),
+                (consent.status | label) if consent else 'Not on file',
+                (('v' ~ consent.version ~ ' · ' ~ (consent.date | d)) if consent else 'Action required'),
                 tone={'accepted': 'good', 'rejected': 'bad', 'pending': 'warn'}.get(consent.status if consent else 'pending', 'warn'),
                 href='#consent',
                 definition='The consent version this participant accepted (or rejected), and when. Consent is a record, not a one-time flag.') }}
     {{ p_metric('My reports', my_reports | length,
-                (my_reports | selectattr('timeline_status', 'equalto', 'breached') | list | length ~ ' past deadline') if my_reports else 'nothing reported',
-                tone='bad' if my_reports | selectattr('timeline_status', 'equalto', 'breached') | list else 'neutral',
+                (my_reports | selectattr('timeline_status', 'equalto', 'breached') | list | length ~ ' past deadline') if (my_reports | selectattr('timeline_status', 'equalto', 'breached') | list) else ('Nothing reported' if not my_reports else (my_reports | length ~ ' on file')),
+                tone='bad' if (my_reports | selectattr('timeline_status', 'equalto', 'breached') | list) else 'neutral',
                 href='#reports',
                 definition='Adverse events and symptom reports filed by or for this participant.') }}
   </div>
@@ -115,6 +115,7 @@
   {# ---- upcoming appointments --------------------------------------------------- #}
   <section class="panel mt-6 overflow-hidden" id="appointments">
     {{ p_panel_head('Upcoming appointments', appointments | length ~ ' scheduled') }}
+    {% if appointments %}
     <div class="tbl-scroll"><table class="tbl" id="tbl-appointments">
       <thead>
         <tr><th data-sort>Visit</th><th data-sort>Scheduled</th><th data-sort>Status</th></tr>
@@ -126,12 +127,24 @@
           <td class="text-slate-600">{{ v.scheduled_at | dt }}</td>
           <td>{{ p_status_badge(v.status) }}</td>
         </tr>
-        {% else %}
-        {{ p_empty(3, 'No appointments are scheduled. The study team will book your visits.') }}
         {% endfor %}
       </tbody>
     </table></div>
     {{ p_toolkit_end('tbl-appointments') }}
+    {% else %}
+    <div class="px-5 py-8 text-center">
+      <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+      </div>
+      <p class="text-sm font-medium text-slate-700">No appointments scheduled</p>
+      <p class="mt-1 text-xs text-slate-500">Your study coordinator will schedule visits and they will appear here.</p>
+    </div>
+    {% endif %}
   </section>
 
   <div class="mt-5 grid items-start gap-5 lg:grid-cols-2">
